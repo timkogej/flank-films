@@ -1,0 +1,51 @@
+.panel {
+  position: fixed;
+  /* Bottom edge, full width, wrapping inside the viewport: it is reviewed at
+     360px too, and it must never push the page sideways or reach the mark. */
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.78);
+  color: #fff;
+  font-family: var(--font-brand);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.panel button {
+  appearance: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: rgb(255 255 255 / 0.1);
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.panel button:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+
+.panel button[data-on] {
+  background: #fff;
+  color: #000;
+}
+
+.rule {
+  width: 1px;
+  height: 14px;
+  background: rgb(255 255 255 / 0.22);
+}

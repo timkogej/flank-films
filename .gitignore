@@ -20,6 +20,9 @@
 # production
 /build
 
+# Local archive masters; browser derivatives live in public/media/projects.
+/_incoming-media/
+
 # misc
 .DS_Store
 *.pem

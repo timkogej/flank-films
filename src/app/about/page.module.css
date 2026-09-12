@@ -1,0 +1,52 @@
+/* About + Contact. Scrolls normally — unlike the desktop homepage, this page
+   is not pinned to one viewport. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--header-gap);
+  padding: max(var(--page-gap), env(safe-area-inset-top, 0px))
+    max(var(--page-gap), env(safe-area-inset-right, 0px))
+    max(var(--page-gap), env(safe-area-inset-bottom, 0px))
+    max(var(--page-gap), env(safe-area-inset-left, 0px));
+  min-height: 100dvh;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--media-gap);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.visuals {
+  display: grid;
+  gap: var(--media-gap);
+}
+
+/* Mobile order: the visual first, the FLANK panel last as the closing moment.
+   The FLANK panel is first in the DOM because that is its desktop position. */
+.visuals > *:nth-child(1) {
+  order: 2;
+  aspect-ratio: 5 / 4;
+}
+
+.visuals > *:nth-child(2) {
+  order: 1;
+  aspect-ratio: 4 / 5;
+}
+
+@media (min-width: 900px) {
+  .visuals {
+    /* Light panel slightly narrower than the visual: the black field carries
+       more weight than its width suggests. */
+    grid-template-columns: 48fr 52fr;
+    height: clamp(340px, 50vh, 560px);
+  }
+
+  .visuals > *:nth-child(1),
+  .visuals > *:nth-child(2) {
+    order: 0;
+    aspect-ratio: auto;
+  }
+}

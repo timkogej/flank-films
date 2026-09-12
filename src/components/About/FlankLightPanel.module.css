@@ -1,0 +1,325 @@
+/* The light's intensity, 0 (out) to 1 (lit). Registered so it can TRANSITION:
+   the light fades by redrawing its own gradients at a lower strength, not by
+   fading a finished layer. Fading a layer's opacity multiplies an already
+   8-bit picture down to a handful of levels — which is exactly where a long
+   dim falloff turns into visible concentric rings. Redrawn, the gradient
+   stays dithered at every step of the fade. */
+@property --glow {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.panel {
+  /* Lobe positions, written by the component while the pointer is inside.
+     Each part of the light has its own, because each follows at its own
+     rate — see FOLLOW in FlankLightPanel.tsx. */
+  --cx: 50%;
+  --cy: 50%;
+  --sx: 50%;
+  --sy: 50%;
+  --hx: 50%;
+  --hy: 50%;
+
+  /* The one size every lobe is proportioned from. */
+  --r: clamp(240px, 26vw, 380px);
+
+  /* Gaussian falloff, exp(-4.6 t^2), sampled every 10% of the radius and
+     scaled to the peak strengths below. No plateau and no shoulder: the value
+     starts falling at the centre and spends most of the radius in a long,
+     near-invisible tail. A flat core followed by a quicker descent is what
+     draws a rim, and a rim is what makes a gradient read as an oval. */
+  --falloff-100:
+    rgb(0 0 0 / 1) 0%, rgb(0 0 0 / 0.955) 10%, rgb(0 0 0 / 0.832) 20%,
+    rgb(0 0 0 / 0.661) 30%, rgb(0 0 0 / 0.479) 40%, rgb(0 0 0 / 0.317) 50%,
+    rgb(0 0 0 / 0.191) 60%, rgb(0 0 0 / 0.105) 70%, rgb(0 0 0 / 0.052) 80%,
+    rgb(0 0 0 / 0.024) 90%, rgb(0 0 0 / 0) 100%;
+  --falloff-35:
+    rgb(0 0 0 / 0.35) 0%,
+    rgb(0 0 0 / 0.334) 10%,
+    rgb(0 0 0 / 0.291) 20%,
+    rgb(0 0 0 / 0.231) 30%,
+    rgb(0 0 0 / 0.168) 40%,
+    rgb(0 0 0 / 0.111) 50%,
+    rgb(0 0 0 / 0.067) 60%,
+    rgb(0 0 0 / 0.037) 70%,
+    rgb(0 0 0 / 0.018) 80%,
+    rgb(0 0 0 / 0.008) 90%,
+    rgb(0 0 0 / 0) 100%;
+  /* The same falloff, as LIGHT rather than as a mask: the haze colour itself
+     at its two peak strengths. See .haze for why it is drawn this way. */
+  --haze-40:
+    rgb(140 140 140 / calc(0.4 * var(--glow))) 0%,
+    rgb(140 140 140 / calc(0.382 * var(--glow))) 10%,
+    rgb(140 140 140 / calc(0.333 * var(--glow))) 20%,
+    rgb(140 140 140 / calc(0.264 * var(--glow))) 30%,
+    rgb(140 140 140 / calc(0.192 * var(--glow))) 40%,
+    rgb(140 140 140 / calc(0.127 * var(--glow))) 50%,
+    rgb(140 140 140 / calc(0.076 * var(--glow))) 60%,
+    rgb(140 140 140 / calc(0.042 * var(--glow))) 70%,
+    rgb(140 140 140 / calc(0.021 * var(--glow))) 80%,
+    rgb(140 140 140 / calc(0.01 * var(--glow))) 90%,
+    rgb(140 140 140 / 0) 100%;
+  --haze-22:
+    rgb(140 140 140 / calc(0.22 * var(--glow))) 0%,
+    rgb(140 140 140 / calc(0.21 * var(--glow))) 10%,
+    rgb(140 140 140 / calc(0.183 * var(--glow))) 20%,
+    rgb(140 140 140 / calc(0.145 * var(--glow))) 30%,
+    rgb(140 140 140 / calc(0.105 * var(--glow))) 40%,
+    rgb(140 140 140 / calc(0.07 * var(--glow))) 50%,
+    rgb(140 140 140 / calc(0.042 * var(--glow))) 60%,
+    rgb(140 140 140 / calc(0.023 * var(--glow))) 70%,
+    rgb(140 140 140 / calc(0.011 * var(--glow))) 80%,
+    rgb(140 140 140 / calc(0.005 * var(--glow))) 90%,
+    rgb(140 140 140 / 0) 100%;
+
+  /* The lit surface. One neutral grey for every light layer, so the desktop
+     light and the touch sweep are the same light. */
+  --surface: #a6a6a6;
+  /* The Gaussian falloff again, as the surface colour itself (166 = #a6). */
+  --surface-100:
+    rgb(166 166 166 / calc(1 * var(--glow))) 0%,
+    rgb(166 166 166 / calc(0.955 * var(--glow))) 10%,
+    rgb(166 166 166 / calc(0.832 * var(--glow))) 20%,
+    rgb(166 166 166 / calc(0.661 * var(--glow))) 30%,
+    rgb(166 166 166 / calc(0.479 * var(--glow))) 40%,
+    rgb(166 166 166 / calc(0.317 * var(--glow))) 50%,
+    rgb(166 166 166 / calc(0.191 * var(--glow))) 60%,
+    rgb(166 166 166 / calc(0.105 * var(--glow))) 70%,
+    rgb(166 166 166 / calc(0.052 * var(--glow))) 80%,
+    rgb(166 166 166 / calc(0.024 * var(--glow))) 90%,
+    rgb(166 166 166 / 0) 100%;
+  --surface-35:
+    rgb(166 166 166 / calc(0.35 * var(--glow))) 0%,
+    rgb(166 166 166 / calc(0.334 * var(--glow))) 10%,
+    rgb(166 166 166 / calc(0.291 * var(--glow))) 20%,
+    rgb(166 166 166 / calc(0.231 * var(--glow))) 30%,
+    rgb(166 166 166 / calc(0.168 * var(--glow))) 40%,
+    rgb(166 166 166 / calc(0.111 * var(--glow))) 50%,
+    rgb(166 166 166 / calc(0.067 * var(--glow))) 60%,
+    rgb(166 166 166 / calc(0.037 * var(--glow))) 70%,
+    rgb(166 166 166 / calc(0.018 * var(--glow))) 80%,
+    rgb(166 166 166 / calc(0.008 * var(--glow))) 90%,
+    rgb(166 166 166 / 0) 100%;
+
+  --mark-w: 48%;
+
+  /* Going OUT: ease-in-out, so the light spends almost no time at the very
+     dimmest values on its way to black. Coming IN: see .lit. */
+  --glow: 0;
+  transition: --glow 300ms cubic-bezier(0.4, 0, 0.6, 1);
+
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  background: #000000;
+  /* Nothing here is clickable; the cursor should not suggest otherwise. */
+  cursor: default;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* The panel must always be the pointer target so offsetX/offsetY stay
+     panel-relative. */
+  pointer-events: none;
+}
+
+.mark {
+  width: var(--mark-w);
+  height: auto;
+}
+
+/* --------------------------------------------------------------------------
+   A. The haze — the atmosphere the light travels through.
+
+   Two broad, dim lobes, deliberately NOT centred on the pointer: the larger
+   sits a little above and behind it, the other a little below and ahead, the
+   way a light placed above an object spills unevenly across the space around
+   it. They overlap almost entirely and differ only gently in strength, so
+   neither can be picked out on its own — what reads is one uneven mass.
+
+   Painted as light, not masked: the lobes are the haze colour itself, laid
+   over the black ground. A flat grey cut by a mask goes through an 8-bit
+   alpha channel, and this long, dim tail is exactly where that shows — as
+   faint concentric rings on the black. A colour gradient is dithered by the
+   browser and has no such steps — and it fades through --glow, so it stays
+   dithered while it fades too.
+   Two translucent layers over black composite exactly as the two mask lobes
+   did, so the light itself is unchanged.
+   -------------------------------------------------------------------------- */
+.haze {
+  background-image:
+    radial-gradient(
+      circle calc(var(--r) * 1.5) at calc(var(--hx) - var(--r) * 0.12)
+        calc(var(--hy) - var(--r) * 0.22),
+      var(--haze-40)
+    ),
+    radial-gradient(
+      circle calc(var(--r) * 1.2) at calc(var(--sx) + var(--r) * 0.16)
+        calc(var(--sy) + var(--r) * 0.12),
+      var(--haze-22)
+    );
+}
+
+/* --------------------------------------------------------------------------
+   B. The inversion — where the light is strong enough to flip the mark.
+
+   Two lobes: a core on the pointer and a broad, faint satellite almost on top
+   of it. The satellite used to be a tighter, much brighter lobe sitting up
+   and to the right of the core, and that is exactly what read as a second,
+   detached blob of light. Now it is half again the core's size at a third of
+   its strength and barely offset, so it only makes the core's falloff uneven
+   — it never has a centre of its own. Where the sum passes roughly 0.6 the
+   letters read darker than the ground around them, so FLANK turns black
+   letter by letter as the light crosses it.
+
+   Split into two layers for the same reason as the haze. The lit SURFACE is
+   painted as colour gradients, so its long dim tail is dithered and cannot
+   step into rings on the black. Only the black WORDMARK is masked — so any
+   8-bit step in the mask can only ever fall inside the letters, where they
+   sit on a bright ground and nothing can be seen.
+   -------------------------------------------------------------------------- */
+/* The masked wordmark is the one light layer that still fades by opacity:
+   it is only ever visible inside the letters, so there is no dim field for a
+   fade to step. Same durations and curves as --glow, so it moves as one. */
+.invertMark {
+  opacity: 0;
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.invert {
+  background-image:
+    radial-gradient(
+      circle calc(var(--r) * 0.7) at var(--cx) var(--cy),
+      var(--surface-100)
+    ),
+    radial-gradient(
+      circle calc(var(--r) * 1.05) at calc(var(--sx) + var(--r) * 0.08)
+        calc(var(--sy) - var(--r) * 0.05),
+      var(--surface-35)
+    );
+}
+
+.invertMark {
+  -webkit-mask-image:
+    radial-gradient(
+      circle calc(var(--r) * 0.7) at var(--cx) var(--cy),
+      var(--falloff-100)
+    ),
+    radial-gradient(
+      circle calc(var(--r) * 1.05) at calc(var(--sx) + var(--r) * 0.08)
+        calc(var(--sy) - var(--r) * 0.05),
+      var(--falloff-35)
+    );
+  mask-image:
+    radial-gradient(
+      circle calc(var(--r) * 0.7) at var(--cx) var(--cy),
+      var(--falloff-100)
+    ),
+    radial-gradient(
+      circle calc(var(--r) * 1.05) at calc(var(--sx) + var(--r) * 0.08)
+        calc(var(--sy) - var(--r) * 0.05),
+      var(--falloff-35)
+    );
+}
+
+/* Pointer inside the panel. Every light layer comes up together, on the
+   same curve — and a little slower than it goes out, so the light gathers
+   where the pointer entered rather than appearing there. */
+.lit {
+  --glow: 1;
+  transition-duration: 420ms;
+  transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.lit .invertMark {
+  opacity: 1;
+  transition-duration: 420ms;
+  transition-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* The light field used ONLY by the no-pointer sweep below: the lit surface
+   carrying the black wordmark, in an identical box at an identical mark width
+   so the two register exactly. The sweep supplies its own mask. */
+.reveal {
+  background: var(--surface);
+  opacity: 0;
+  transition: opacity 300ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* --------------------------------------------------------------------------
+   No fine pointer: one automatic sweep on first view.
+
+   The mask becomes a soft band travelling once across the panel, and finishes
+   fully off the right edge — so the panel settles back to its clean resting
+   state of black + white FLANK rather than holding an inverted frame.
+   -------------------------------------------------------------------------- */
+.swept .reveal {
+  opacity: 1;
+  -webkit-mask-image: linear-gradient(
+    100deg,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / 0.12) 22%,
+    rgb(0 0 0 / 0.6) 38%,
+    rgb(0 0 0 / 0.86) 48%,
+    rgb(0 0 0 / 0.86) 52%,
+    rgb(0 0 0 / 0.6) 62%,
+    rgb(0 0 0 / 0.12) 78%,
+    rgb(0 0 0 / 0) 100%
+  );
+  mask-image: linear-gradient(
+    100deg,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / 0.12) 22%,
+    rgb(0 0 0 / 0.6) 38%,
+    rgb(0 0 0 / 0.86) 48%,
+    rgb(0 0 0 / 0.86) 52%,
+    rgb(0 0 0 / 0.6) 62%,
+    rgb(0 0 0 / 0.12) 78%,
+    rgb(0 0 0 / 0) 100%
+  );
+  -webkit-mask-size: 190% 100%;
+  mask-size: 190% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: flankSweep 1000ms cubic-bezier(0.42, 0.1, 0.58, 0.9) both;
+}
+
+@keyframes flankSweep {
+  from {
+    -webkit-mask-position: -140% 0;
+    mask-position: -140% 0;
+  }
+  to {
+    -webkit-mask-position: 240% 0;
+    mask-position: 240% 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .panel {
+    /* Matched to the slightly stronger desktop mark, not enlarged beyond it. */
+    --mark-w: 60%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion: no sweep, and the pointer reveal loses its easing rather
+   than its function — it tracks, it just does not trail (the component snaps
+   every lobe to the pointer under this query).
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .reveal,
+  .invertMark {
+    transition: none;
+  }
+
+  .swept .reveal {
+    animation: none;
+    opacity: 0;
+  }
+}

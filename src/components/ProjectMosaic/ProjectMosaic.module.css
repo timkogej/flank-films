@@ -1,0 +1,161 @@
+.mosaic {
+  display: grid;
+  gap: var(--media-gap);
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Mobile: one column of full-width frames, twice interrupted by a pair.
+   02 + 03 (Fresh 32 / Petrol) and 06 + 07 (Pingo / Pingo) are the only rows
+   that split, and they split the same way — the page reads as a sequence with
+   two beats in it rather than a list. */
+@media (max-width: 699px) {
+  .mosaic {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(0, auto);
+  }
+
+  .mosaic > [data-slot="01"] {
+    grid-column: 1 / 3;
+    aspect-ratio: 3 / 2;
+  }
+
+  .mosaic > [data-slot="02"] {
+    grid-column: 1 / 2;
+    aspect-ratio: 4 / 5;
+  }
+
+  .mosaic > [data-slot="03"] {
+    grid-column: 2 / 3;
+    aspect-ratio: 4 / 5;
+  }
+
+  .mosaic > [data-slot="04"] {
+    grid-column: 1 / 3;
+    aspect-ratio: 21 / 9;
+  }
+
+  .mosaic > [data-slot="05"] {
+    grid-column: 1 / 3;
+    aspect-ratio: 4 / 5;
+  }
+
+  .mosaic > [data-slot="06"] {
+    grid-column: 1 / 2;
+    aspect-ratio: 1 / 1;
+  }
+
+  .mosaic > [data-slot="07"] {
+    grid-column: 2 / 3;
+    aspect-ratio: 1 / 1;
+  }
+
+  .mosaic > [data-slot="08"] {
+    grid-column: 1 / 3;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* Tablet: a dedicated eight-card composition. The wide Schweppes frame holds
+   the top right, portrait Bohinj anchors the lower right, and the two small
+   pairs sit on the same band so neither one is a leftover. */
+@media (min-width: 700px) and (max-width: 1099px) {
+  .mosaic {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-rows: calc((100vw - 2 * var(--page-gap)) / 14);
+  }
+
+  .mosaic > [data-slot="01"] {
+    grid-column: 1 / 7;
+    grid-row: 1 / 9;
+  }
+
+  .mosaic > [data-slot="04"] {
+    grid-column: 7 / 13;
+    grid-row: 1 / 6;
+  }
+
+  .mosaic > [data-slot="06"] {
+    grid-column: 7 / 10;
+    grid-row: 6 / 9;
+  }
+
+  .mosaic > [data-slot="07"] {
+    grid-column: 10 / 13;
+    grid-row: 6 / 9;
+  }
+
+  .mosaic > [data-slot="02"] {
+    grid-column: 1 / 5;
+    grid-row: 9 / 14;
+  }
+
+  .mosaic > [data-slot="03"] {
+    grid-column: 5 / 9;
+    grid-row: 9 / 14;
+  }
+
+  .mosaic > [data-slot="05"] {
+    grid-column: 9 / 13;
+    grid-row: 9 / 18;
+  }
+
+  .mosaic > [data-slot="08"] {
+    grid-column: 1 / 9;
+    grid-row: 14 / 18;
+  }
+}
+
+/* Desktop: the approved 12 x 12 viewport composition. At 1440 x 900 the twelve
+   columns and twelve rows resolve to the frames the art direction was drawn
+   against — 01 472x552, 02 and 03 234x274 each, 04 591x274, 05 353x483,
+   06 353x205, 07 234x205, 08 948x344 — and every other width is the same
+   composition, scaled. */
+@media (min-width: 1100px) {
+  .mosaic {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: repeat(12, minmax(0, 1fr));
+    height: 100%;
+  }
+
+  .mosaic > [data-slot="01"] {
+    grid-column: 1 / 5;
+    grid-row: 1 / 9;
+  }
+
+  /* The pair. Two cards, one 4px gutter — never one card spanning both. */
+  .mosaic > [data-slot="02"] {
+    grid-column: 1 / 3;
+    grid-row: 9 / 13;
+  }
+
+  .mosaic > [data-slot="03"] {
+    grid-column: 3 / 5;
+    grid-row: 9 / 13;
+  }
+
+  .mosaic > [data-slot="04"] {
+    grid-column: 5 / 10;
+    grid-row: 1 / 5;
+  }
+
+  .mosaic > [data-slot="05"] {
+    grid-column: 10 / 13;
+    grid-row: 1 / 8;
+  }
+
+  .mosaic > [data-slot="06"] {
+    grid-column: 5 / 8;
+    grid-row: 5 / 8;
+  }
+
+  .mosaic > [data-slot="07"] {
+    grid-column: 8 / 10;
+    grid-row: 5 / 8;
+  }
+
+  .mosaic > [data-slot="08"] {
+    grid-column: 5 / 13;
+    grid-row: 8 / 13;
+  }
+}

@@ -1,0 +1,791 @@
+/* ==========================================================================
+   FLANK project viewer.
+
+   The numbers below mirror viewerConfig.ts one-for-one. JS owns when a route
+   changes; CSS owns the motion. Tune them together.
+
+   Everything is scoped to .viewer as component tokens rather than added to
+   globals.css: the viewer is the only surface on the site with a veil, a
+   playhead or a control bar, and none of that language should be reachable
+   from the homepage or /about.
+   ========================================================================== */
+
+.viewer {
+  --viewer-ink: #000000;
+  --viewer-ground: #ffffff;
+  /* Not opaque, and not meant to be: the portfolio should still be legible as
+     a portfolio behind the film. */
+  --viewer-veil: rgb(255 255 255 / 0.58);
+  --viewer-blur: 20px;
+
+  --viewer-pad-y: 16px;
+  --viewer-pad-x: 48px;
+
+  /* Device insets, resolved once. `max()` against the design padding means a
+     phone with a notch gets clear of it and a phone without one is completely
+     unaffected — env() is 0px there, so nothing gains a millimetre. Needs
+     viewport-fit=cover in the document viewport to be non-zero at all. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --pad-t: max(var(--viewer-pad-y), var(--safe-t));
+  --pad-r: max(var(--viewer-pad-x), var(--safe-r));
+  --pad-b: max(var(--viewer-pad-y), var(--safe-b));
+  --pad-l: max(var(--viewer-pad-x), var(--safe-l));
+  --viewer-topbar: 40px;
+  --viewer-controls: 44px;
+  --viewer-row-gap: 12px;
+  /* Both gaps in the stage column. A project with no film has only one. */
+  --viewer-gap-total: calc(var(--viewer-row-gap) * 2);
+
+  --viewer-open: 380ms;
+  --viewer-close: 260ms;
+  --switch-out: 160ms;
+  --switch-in: 200ms;
+  --film-fade: 220ms;
+  --chrome-fade: 180ms;
+  --viewer-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Declared here and NOT on .film: the real ratio is set as an inline custom
+     property on .stage, and a declaration on .film itself would win over that
+     inherited value rather than fall back to it. */
+  --film-ratio: 1.7777778;
+
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  color: var(--viewer-ink);
+  /* The size container everything measures against. It is the viewport, but
+     naming it here means the film box and the chrome column are derived from
+     one source with no measurement, no resize listener and no remount. */
+  container-type: size;
+  /* The film is the only thing here with weight; nothing else may scroll. */
+  overscroll-behavior: contain;
+}
+
+/* The dialog is a focus destination, never a focus indicator: it is not
+   reachable by Tab, so there is nothing here for a ring to communicate. */
+.viewer:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   The backdrop.
+
+   Opened from the homepage this is a veil over the real mosaic, not a
+   replacement for it — the work stays recognisable, just no longer the thing
+   being looked at. Opened directly there is nothing behind it, so it is simply
+   the FLANK ground.
+   -------------------------------------------------------------------------- */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--viewer-veil);
+  /* Written unprefixed only, on purpose. The build's CSS pipeline emits the
+     prefixed form for the targets that need it (Safari), and hand-writing
+     both made it keep the -webkit- one and drop the standard one — which is
+     exactly backwards for every browser but old Safari. Verified in the
+     emitted stylesheet, not assumed. */
+  /* The slight lift is what separates a light film from a light page:
+     the portfolio behind reads as a brighter, softer field, and the work
+     sits on top of it rather than dissolving into it. */
+  backdrop-filter: blur(var(--viewer-blur)) saturate(0.78) brightness(1.07);
+  transition: opacity var(--viewer-close) var(--viewer-ease);
+  animation: veilIn var(--viewer-open) var(--viewer-ease);
+}
+
+/* Without blur the veil has to do the whole job, so it carries more weight.
+   The homepage is then suggested rather than legible, which is the right
+   failure: never a sharp, readable page competing with the film. */
+@supports not (
+  (backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))
+) {
+  .backdrop {
+    background: rgb(255 255 255 / 0.93);
+  }
+}
+
+.viewer[data-mode="page"] .backdrop {
+  background: var(--viewer-ground);
+  backdrop-filter: none;
+}
+
+/* --------------------------------------------------------------------------
+   The stage: top identification, the film, the controls.
+
+   All three regions hold their space permanently and only their contents
+   fade. If the bar collapsed when it hid, the film would resize every two
+   seconds of quiet playback.
+
+   This element — not the raw <video> — is what goes fullscreen, so the FLANK
+   controls go with it.
+   -------------------------------------------------------------------------- */
+.stage {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--viewer-row-gap);
+  padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+
+  /* The largest box of the film's own ratio that fits in BOTH axes. */
+  --film-avail-h: calc(
+    100cqh - var(--pad-t) - var(--pad-b) - var(--viewer-topbar) -
+      var(--viewer-controls) - var(--viewer-gap-total)
+  );
+  --film-avail-w: calc(100cqw - var(--pad-l) - var(--pad-r));
+  --film-w: min(
+    var(--film-avail-w),
+    calc(var(--film-avail-h) * (var(--film-ratio)))
+  );
+  /* The other side of the same box. Only the touch layout needs it, where the
+     film's own height is what the chrome hugs. */
+  --film-h: min(
+    calc(var(--film-avail-w) / (var(--film-ratio))),
+    var(--film-avail-h)
+  );
+  /* The chrome shares that width, so the title sits on the film's left edge
+     and Close on its right. A control bar stretched across the whole viewport
+     under a narrow portrait film is what a video player looks like; a column
+     that belongs to the work is what a portfolio looks like. Floored so a very
+     tall film cannot squeeze the top row. */
+  --column-w: clamp(
+    min(var(--film-avail-w), 380px),
+    var(--film-w),
+    var(--film-avail-w)
+  );
+}
+
+.stage:fullscreen,
+.stage:-webkit-full-screen {
+  background: var(--viewer-ground);
+}
+
+/* --------------------------------------------------------------------------
+   The film box.
+
+   The whole point of the viewer: the work keeps its own shape. The frame is a
+   size container, so the film can be given the largest box of its ratio that
+   fits in BOTH axes with one declaration and no measurement, no resize
+   listener and no remount. `width: 100%` above it is the fallback if container
+   query units are unavailable.
+   -------------------------------------------------------------------------- */
+.frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Last-resort guard for a browser without container query units, where the
+     fallback sizing below can only honour one axis. */
+  overflow: hidden;
+}
+
+.film {
+  position: relative;
+  /* Fallback for browsers without container query units. */
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: var(--film-ratio);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--placeholder-base);
+  /* Just enough to lift the work off the veil. Not a cinema border. */
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 20px 54px -26px rgb(0 0 0 / 0.3);
+  transition:
+    opacity var(--switch-in) var(--viewer-ease),
+    transform var(--switch-in) var(--viewer-ease);
+  animation: filmIn var(--viewer-open) var(--viewer-ease);
+}
+
+.film[data-film="true"] {
+  cursor: pointer;
+}
+
+.filmMedia {
+  position: absolute;
+  inset: 0;
+}
+
+/* Layer 0 — inline, painted with the document, no request to lose. */
+.filmPlaceholder {
+  position: absolute;
+  inset: 0;
+  background-image: var(--lqip, none);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* `contain`, not `cover`: the mosaic crops, the viewer never does. */
+.filmLayer {
+  /* A long-press or drag on the work should do nothing at all. */
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.filmVideo {
+  opacity: 0;
+  transition: opacity var(--film-fade) linear;
+}
+
+/* A still project's own artwork, at viewer resolution. It arrives over the
+   poster exactly the way a film does, and by the same rule: the layer beneath
+   is never removed, so the box is correct before this lands and correct if it
+   never does. */
+.filmStill {
+  opacity: 0;
+  transition: opacity var(--film-fade) linear;
+}
+
+.filmStillShown {
+  opacity: 1;
+}
+
+.filmVideoShown {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Top region: what this is, and the ways out of it.
+   -------------------------------------------------------------------------- */
+.topbar {
+  flex: 0 0 auto;
+  height: var(--viewer-topbar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition:
+    opacity var(--chrome-fade) ease,
+    transform var(--chrome-fade) ease;
+  animation: chromeIn var(--viewer-open) var(--viewer-ease);
+}
+
+.identity {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  transition: opacity var(--switch-in) var(--viewer-ease);
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.004em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Same rule as the mosaic's card metadata: a qualifier keeps the campaign's
+   line, one step down in size and case. */
+.metaNote {
+  font-size: 0.88em;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.navButton,
+.closeButton,
+.control {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Small mark, accessible target. */
+  min-width: 40px;
+  height: 40px;
+  opacity: 0.55;
+  transition: opacity 160ms ease;
+}
+
+.navButton {
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.navGlyph {
+  width: 13px;
+  height: 13px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .navButton:hover,
+  .closeButton:hover,
+  .control:hover {
+    opacity: 1;
+  }
+}
+
+.navButton:focus-visible,
+.closeButton:focus-visible,
+.control:focus-visible,
+.seek:focus-visible {
+  opacity: 1;
+}
+
+.actionsDivider {
+  width: 1px;
+  height: 12px;
+  margin: 0 8px;
+  background: currentColor;
+  opacity: 0.2;
+}
+
+/* --------------------------------------------------------------------------
+   Bottom region: play, playhead, timeline, sound, fullscreen. Nothing else.
+   -------------------------------------------------------------------------- */
+.controls {
+  flex: 0 0 auto;
+  height: var(--viewer-controls);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity var(--chrome-fade) ease,
+    transform var(--chrome-fade) ease;
+  animation: chromeIn var(--viewer-open) var(--viewer-ease);
+}
+
+.bar {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Timeline.
+
+   A real <input type="range">, so keyboard seeking, touch dragging and
+   assistive technology work without being reimplemented. The track is 2px; the
+   element is 30px, and all of it is grabbable.
+   -------------------------------------------------------------------------- */
+.seek {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  height: 30px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.seek::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    var(--viewer-ink) 0 var(--progress, 0%),
+    rgb(0 0 0 / 0.15) var(--progress, 0%) 100%
+  );
+}
+
+.seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px;
+  height: 9px;
+  margin-top: -3.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--viewer-ink);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.seek:hover::-webkit-slider-thumb,
+.seek:active::-webkit-slider-thumb,
+.seek:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.seek::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: rgb(0 0 0 / 0.15);
+}
+
+.seek::-moz-range-progress {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--viewer-ink);
+}
+
+.seek::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--viewer-ink);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.seek:hover::-moz-range-thumb,
+.seek:active::-moz-range-thumb,
+.seek:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* The film box and the chrome column, both derived from the one size
+   container on .viewer. Declared here rather than beside each rule so it
+   reliably wins on source order over the fallback widths above. */
+@supports (width: 1cqw) {
+  .film {
+    width: var(--film-w);
+  }
+
+  .topbar,
+  .bar {
+    width: var(--column-w);
+    margin-inline: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   A stall, once it has lasted long enough to be one. Four pixels in a corner.
+   -------------------------------------------------------------------------- */
+.buffering {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffffff;
+  mix-blend-mode: difference;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+.buffering[data-visible="true"] {
+  opacity: 1;
+  animation: bufferPulse 1200ms ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   States.
+   -------------------------------------------------------------------------- */
+
+/* Quiet playback: the interface leaves. */
+.viewer[data-idle="true"] .topbar {
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+}
+
+.viewer[data-idle="true"] .controls {
+  opacity: 0;
+  transform: translateY(3px);
+  pointer-events: none;
+}
+
+/* Only over the film, only while it is playing, and back the instant the
+   pointer moves. Never hidden over a control — and never on a touch screen,
+   where there is no cursor to hide and the rule would be dead weight. */
+@media (hover: hover) and (pointer: fine) {
+  .viewer[data-idle="true"] .frame {
+    cursor: none;
+  }
+}
+
+/* Previous / next: the outgoing film and its title leave together, the route
+   changes while they are gone, and the incoming pair arrives. The shell never
+   moves, so the viewer is never returned to the homepage in between. */
+.viewer[data-switch="out"] .film,
+.viewer[data-switch="out"] .identity {
+  opacity: 0;
+  transition-duration: var(--switch-out);
+}
+
+/* A few pixels in the direction of travel — enough to say which way the work
+   moved, far too little to read as a carousel sliding a page across. The film
+   never follows a finger; it is already gone before the next one arrives.
+   Touch only, because it answers a gesture: the desktop switch keeps the pure
+   cross-fade Phase 5 locked. */
+@media (hover: none) and (pointer: coarse) {
+  .viewer[data-switch="out"][data-dir="next"] .film {
+    transform: translateX(-8px);
+  }
+
+  .viewer[data-switch="out"][data-dir="prev"] .film {
+    transform: translateX(8px);
+  }
+}
+
+.viewer[data-state="closing"] .backdrop {
+  opacity: 0;
+}
+
+.viewer[data-state="closing"] .film {
+  opacity: 0;
+  transform: translateY(6px) scale(0.99);
+  transition-duration: var(--viewer-close);
+}
+
+.viewer[data-state="closing"] .topbar,
+.viewer[data-state="closing"] .controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes veilIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes filmIn {
+  from {
+    opacity: 0;
+    transform: translateY(9px) scale(0.982);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chromeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bufferPulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   TOUCH.
+
+   Capability, not width: a tablet with a trackpad keeps the pointer layout, a
+   phone gets this one.
+
+   The one change that matters. On a pointer screen the film fills most of the
+   height, so chrome pinned to the top and bottom edges reads as a frame around
+   it. On a phone holding a landscape film it does not: a 16:9 cut is a quarter
+   of the viewport, and the title and controls end up marooned three hundred
+   pixels away at either end of an empty white screen — a web page with a
+   stray toolbar, not a film.
+
+   So on touch the three regions stop being edges and become a block: title,
+   film, controls, centred together. The film keeps exactly the size it had —
+   nothing is scaled, cropped or rebalanced — and the interface simply comes
+   back to sit with the work it belongs to.
+   -------------------------------------------------------------------------- */
+@media (hover: none) and (pointer: coarse) {
+  .stage {
+    justify-content: center;
+  }
+
+  /* A project with no film reserves no room for a player. The photography
+     piece is not a video with its controls switched off — there is nothing to
+     control, so on a phone, where the space is worth the most, it goes to the
+     work instead of sitting empty beneath it.
+     Touch only: the desktop viewer's geometry is locked from Phase 5. */
+  .viewer[data-has-film="false"] {
+    --viewer-controls: 0px;
+    --viewer-gap-total: var(--viewer-row-gap);
+  }
+
+  .viewer[data-has-film="false"] .controls {
+    display: none;
+  }
+
+  @supports (width: 1cqw) {
+    /* The frame stops absorbing the slack and takes exactly the film's height,
+       which leaves the leftover space outside the block rather than inside it. */
+    .frame {
+      flex: 0 0 auto;
+      height: var(--film-h);
+    }
+
+    /* Optical rather than mathematical centring. A block centred by arithmetic
+       on a tall canvas reads low, and this one is bottom-heavy anyway — the
+       controls carry more weight than the title. Lifting it by a tenth of the
+       leftover space settles it. Expressed against the slack itself, so a film
+       that already fills the height is not moved at all. */
+    .controls {
+      margin-bottom: calc((var(--film-avail-h) - var(--film-h)) * 0.2);
+    }
+  }
+
+  /* Horizontal gestures on the film belong to the viewer; vertical ones stay
+     with the browser. Deliberately not `touch-action: none` — see §67. */
+  .frame {
+    touch-action: pan-y;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens.
+
+   Secondary UI is reduced before any hit target is: the PREV/NEXT words go,
+   the duration goes, the insets tighten. Play, timeline, sound, fullscreen and
+   close all keep a 40px target.
+   -------------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  .viewer {
+    --viewer-pad-x: 20px;
+  }
+}
+
+@media (max-width: 699px) {
+  .viewer {
+    --viewer-pad-y: 10px;
+    --viewer-pad-x: 12px;
+    --viewer-topbar: 38px;
+    --viewer-controls: 42px;
+    --viewer-row-gap: 8px;
+    --viewer-blur: 18px;
+  }
+
+  .navLabel {
+    display: none;
+  }
+
+  .navButton {
+    padding: 0;
+    gap: 0;
+  }
+
+  .actionsDivider {
+    margin: 0 4px;
+  }
+
+  .bar {
+    gap: 8px;
+  }
+
+  /* Secondary UI was reduced first (the PREV/NEXT words, the duration); the
+     targets themselves get bigger, not smaller. */
+  .navButton,
+  .closeButton,
+  .control {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .seek {
+    height: 36px;
+  }
+
+  .title {
+    font-size: 12px;
+  }
+
+  .meta {
+    font-size: 9.5px;
+  }
+}
+
+/* Very narrow: the duration is the first thing the film does not need. The
+   threshold sits below every common phone width — at 390px the timeline still
+   has 180px, and hiding the duration there was premature. */
+@media (max-width: 359px) {
+  .timeRest {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion.
+
+   The viewer stays whole — it is the film the visitor asked for, not
+   decoration, so nothing about it is withheld. Only the travel goes:
+   opacity does the work and nothing scales or slides. globals.css already
+   collapses the durations; this removes the displacement, and the viewer's
+   own JS drops its transition waits to zero to match.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .film,
+  .topbar,
+  .controls {
+    transform: none !important;
+    animation: none;
+  }
+
+  .backdrop {
+    animation: none;
+  }
+
+  .buffering[data-visible="true"] {
+    animation: none;
+  }
+}

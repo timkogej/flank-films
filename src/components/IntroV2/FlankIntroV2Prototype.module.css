@@ -1,0 +1,255 @@
+/* ==========================================================================
+   FLANK intro V2 — PROTOTYPE. Step 2.
+   Not the production intro. See FlankIntroV2Prototype.tsx.
+
+   This file knows how to DRAW a frame. It does not know when anything happens:
+   the component's clock writes --white-o and --reveal-p every frame, and the
+   score lives in introV2Config.ts. There are no animation delays here on
+   purpose — that is what keeps the cuts frame-accurate and 0.5x QA exact.
+   ========================================================================== */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  /* Pure black. Nothing else (§39). */
+  background: #000000;
+  /* A lone wordmark on the exact middle reads slightly low. */
+  padding-bottom: 2.4dvh;
+  /* Nothing here is interactive except the dev panel, which opts back in. */
+  pointer-events: none;
+
+  /* ------------------------------------------------------------------------
+     Wordmark width (§5, §38).
+
+     One continuous function of the viewport, so the mark never jumps between
+     390 and 2560. Phone and tablet retain Step 1's proven curve. Above 1190px,
+     42vw gives the deliberately wider character shots enough real pixel area
+     to read immediately while the 720px ceiling keeps large screens restrained.
+
+       390   296px   75.8vw      1280   538px   42.0vw
+       768   420px   54.7vw      1440   605px   42.0vw
+      1024   500px   48.8vw      1920   720px   37.5vw  (ceiling)
+     ------------------------------------------------------------------------ */
+  --mark-width: min(720px, max(min(500px, 168px + 32.7vw), 42vw));
+
+  /* The official mark, unmodified, used as the mask for both layers. */
+  --mark-src: url("/brand/flank-wordmark-white.svg");
+
+  /* Written every frame by the clock. Defaults are the opening state, so the
+     very first paint is correct even before the loop's first tick. */
+  --white-o: 0;
+  --reveal-p: 100%;
+}
+
+.mark {
+  position: relative;
+  width: var(--mark-width);
+  /* The official viewBox. Both layers inherit this box, so `contain` resolves
+     to the same rectangle in each. */
+  aspect-ratio: 1499 / 226;
+}
+
+/* --------------------------------------------------------------------------
+   The shared mask.
+
+   `contain` rather than `100% 100%`: the box is already the mark's aspect
+   ratio, so the two agree to the pixel, but `contain` cannot distort the
+   official geometry even if sub-pixel rounding makes the box a hair off.
+
+   Prefixed and unprefixed everywhere. Safari 16.3 and earlier only has the
+   -webkit- form, and nothing in this file needs a Chromium-only feature: the
+   reveal is a NESTED mask rather than a `mask-composite` stack, which the two
+   engines spell differently.
+   -------------------------------------------------------------------------- */
+.white,
+.media {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: var(--mark-src);
+  mask-image: var(--mark-src);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 1 — the white wordmark.
+
+   Opacity only. No scale, no bounce, no blur (§4). It is never faded out: the
+   film above it is opaque, so it is simply covered as the exposure passes, and
+   the only place the two ever meet is inside the reveal's soft edge — which is
+   the transition itself, not a wash.
+   -------------------------------------------------------------------------- */
+.white {
+  background: #ffffff;
+  opacity: var(--white-o);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 2 — the film.
+
+   `.media`   the ONE masked element. Three <video> children live inside it.
+     `.reveal`  the travelling exposure, a second mask on a nested element.
+       `.field`   the grade, applied once to whichever clip is showing.
+   -------------------------------------------------------------------------- */
+.media {
+  z-index: 1;
+}
+
+.reveal {
+  position: absolute;
+  inset: 0;
+  /* A soft-edged band 2.6x the width of the mark, making one pass. Solid
+     through its first 44%, transparent after 56%: at --reveal-p 100% the
+     window sits entirely in the transparent tail (nothing exposed), at 0%
+     entirely in the solid head (fully exposed). The ramp is tighter than
+     Step 1's because this pass is 220ms rather than 1700ms — at that speed a
+     broad edge reads as a wash instead of light travelling through the word.
+     96deg puts a slight tilt on it so it is not a mechanical wipe. */
+  --reveal-band: linear-gradient(
+    96deg,
+    #000000 0%,
+    #000000 44%,
+    rgb(0 0 0 / 0.86) 47%,
+    rgb(0 0 0 / 0.54) 50%,
+    rgb(0 0 0 / 0.22) 53%,
+    rgb(0 0 0 / 0.05) 55%,
+    rgb(0 0 0 / 0) 56%,
+    rgb(0 0 0 / 0) 100%
+  );
+  -webkit-mask-image: var(--reveal-band);
+  mask-image: var(--reveal-band);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 260% 100%;
+  mask-size: 260% 100%;
+  /* The clock drives this. 100% = nothing exposed, 0% = fully exposed. */
+  -webkit-mask-position: var(--reveal-p) 50%;
+  mask-position: var(--reveal-p) 50%;
+}
+
+.field {
+  position: absolute;
+  inset: 0;
+  /* Black under the film, not white: if a frame ever failed to arrive the
+     letter would go dark rather than glow. */
+  background: #000000;
+}
+
+/* --------------------------------------------------------------------------
+   The clips, and the cut.
+
+   All three are stacked and only one is ever visible. The swap has NO
+   transition — the silhouette is identical on both sides of it, so the eye
+   reads a film edit rather than a shape change (§13). No black frame, no white
+   flash, no dissolve.
+   -------------------------------------------------------------------------- */
+.frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--crop);
+  transform: scale(var(--scale));
+  transform-origin: var(--crop);
+  /* Per clip, not shared — see the grade note in introV2Config.ts. Only one
+     clip is ever visible, so three filters cost what one did. */
+  filter: var(--grade);
+  opacity: 0;
+}
+
+.mark[data-shot="pingo"] .frame[data-shot="pingo"],
+.mark[data-shot="otp"] .frame[data-shot="otp"],
+.mark[data-shot="bohinj"] .frame[data-shot="bohinj"],
+.step1 .frame {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile (§28, §29).
+
+   The width curve already lands on ~76vw at 390. What changes here is the
+   CROP. Bohinj keeps its established close mobile aim. Pingo and OTP now carry
+   their own wider mobile crops in the score so complete character information
+   survives instead of being enlarged into isolated features.
+   -------------------------------------------------------------------------- */
+@media (max-width: 699px) {
+  .frame {
+    object-position: var(--crop-m);
+    transform: scale(var(--scale-m));
+    transform-origin: var(--crop-m);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion (§41).
+
+   Black, and a static white FLANK. The component puts no <video> in the tree
+   at all, so nothing is fetched either; this is the belt to that braces.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .media {
+    display: none;
+  }
+
+  .white {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Dev-only controls (§31). Deliberately unstyled-looking. Press H to hide.
+   -------------------------------------------------------------------------- */
+.controls {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 9px;
+  background: rgb(0 0 0 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: rgb(255 255 255 / 0.55);
+  pointer-events: auto;
+}
+
+.controlsLabel,
+.controlsNote {
+  color: rgb(255 255 255 / 0.34);
+  text-transform: uppercase;
+}
+
+.controlsRow {
+  display: flex;
+  gap: 4px;
+}
+
+.controls button {
+  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 3px;
+  font: inherit;
+  color: rgb(255 255 255 / 0.6);
+  cursor: pointer;
+}
+
+.controls button[data-active="true"] {
+  background: rgb(255 255 255 / 0.9);
+  border-color: rgb(255 255 255 / 0.9);
+  color: #000000;
+}

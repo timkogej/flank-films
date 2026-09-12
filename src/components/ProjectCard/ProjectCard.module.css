@@ -1,0 +1,299 @@
+.card {
+  /* Component tokens. Deliberately local rather than global: nothing outside
+     the mosaic uses them, and /about must not inherit a hover language. */
+  --preview-fade: 200ms;
+  --project-hover-scale: 1.015;
+  --project-hover-duration: 520ms;
+  --project-hover-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --project-meta-duration: 220ms;
+  --project-meta-inset: 16px;
+
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  background: var(--placeholder-base);
+  /* Guarantees the frame has geometry before any media resolves. */
+  min-height: 0;
+  min-width: 0;
+  /* Type scales against the CARD, not the viewport — the mosaic puts a 682px
+     frame next to a 150px one at the same width, and vw cannot tell them
+     apart. inline-size only: no size containment, so the grid and the mobile
+     aspect-ratios still drive the box exactly as before. */
+  container-type: inline-size;
+  /* The frame is an <a> once the viewer is enabled. Blockified by the grid
+     anyway, but stated so the box can never depend on that. */
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The media stack: still underneath, preview above, both filling the frame. */
+.frame {
+  position: absolute;
+  inset: 0;
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--focal-desktop);
+  transition: transform var(--project-hover-duration) var(--project-hover-ease);
+}
+
+.video {
+  opacity: 0;
+  /* The still stays underneath permanently, so this is a crossfade onto a
+     surface that is already correct — the frame can never flash black. */
+  transition:
+    opacity var(--preview-fade) linear,
+    transform var(--project-hover-duration) var(--project-hover-ease);
+}
+
+.videoShown {
+  opacity: 1;
+}
+
+/* Layer 0: the surface that is always underneath everything else.
+
+   The inline LQIP is a ~24px image stretched over the frame. No blur filter:
+   the browser's own smoothing on that much upscale already gives a soft field
+   of the right tone, and eight filtered layers would cost more than the whole
+   effect is worth. The gradient is the last resort behind it. */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-image: var(--lqip, none);
+  background-size: cover;
+  background-position: var(--focal-desktop);
+  background-repeat: no-repeat;
+}
+
+.placeholder::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--placeholder-base) 100%, #000 0%) 0%,
+    color-mix(in srgb, var(--placeholder-shade) 100%, #000 var(--tone)) 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Metadata.
+
+   Printed straight onto the film: no panel, no badge, no button, no icon. At
+   rest it is not there at all.
+   -------------------------------------------------------------------------- */
+.meta {
+  position: absolute;
+  left: var(--project-meta-inset);
+  right: var(--project-meta-inset);
+  bottom: var(--project-meta-inset);
+  z-index: 2;
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  color: #ffffff;
+  /* Never intercepts the pointer — the card below must keep receiving enter
+     and leave, and later the click. */
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--project-meta-duration) ease,
+    transform var(--project-meta-duration) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.metaTitle {
+  font-size: clamp(15px, 4.1cqw, 22px);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.15;
+  /* A tiny card must clip its title rather than wrap into the frame. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaLine {
+  font-size: clamp(10px, 2.1cqw, 12px);
+  font-weight: 400;
+  letter-spacing: 0.055em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  opacity: 0.72;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Lands just behind the title. Enough to feel composed, not a stagger. */
+  transition-delay: 55ms;
+}
+
+/* The subordinate half of the campaign line — "· AI", "· AI-Hybrid",
+   "· (spec)" and nothing more ambitious. Smaller, quieter and out of the
+   uppercasing, so it reads as production metadata rather than as part of the
+   name. No colour, no border, no pill: it is the same line, one step down. */
+.metaNote {
+  font-size: 0.86em;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.8;
+}
+
+/* Local luminance drop under the type only. Never a full-card overlay, and
+   never present at rest. */
+.scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--project-meta-duration) ease;
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / 0.06) 40%,
+    rgb(0 0 0 / 0.2) 66%,
+    rgb(0 0 0 / 0.38) 88%,
+    rgb(0 0 0 / 0.46) 100%
+  );
+}
+
+/* Development-only frame number. Config flag lives in src/lib/site.ts. */
+.placeholderId {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  z-index: 3;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: rgb(255 255 255 / 0.5);
+  mix-blend-mode: difference;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Hover — fine pointers only. A touch device must never enter this state and
+   get stuck in it.
+   -------------------------------------------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover .media {
+    transform: scale(var(--project-hover-scale));
+  }
+
+  .card:hover .meta,
+  .card:hover .scrim {
+    opacity: 1;
+  }
+
+  .card:hover .meta {
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   No hover available.
+
+   Capability, not width — and this was a real bug. The always-visible
+   treatment used to be gated on `max-width: 699px`, while the reveal needed a
+   fine pointer. A tablet in portrait qualified for neither: the project titles
+   were rendered at opacity 0 with no gesture on earth that could show them.
+
+   A frame that cannot be hovered simply carries its name, quietly.
+   -------------------------------------------------------------------------- */
+@media (hover: none) {
+  .meta,
+  .scrim {
+    transform: none;
+  }
+
+  .meta {
+    opacity: 0.92;
+  }
+
+  .scrim {
+    height: 42%;
+    opacity: 0.85;
+  }
+}
+
+/* Keyboard parity: focus shows exactly what hover shows, minus the playback.
+   Metadata is the only thing a keyboard user is currently missing. */
+.card:focus-visible .meta,
+.card:focus-visible .scrim {
+  opacity: 1;
+}
+
+.card:focus-visible .meta {
+  transform: translateY(0);
+}
+
+/* A ring that survives both a black frame and a white one, drawn inside the
+   radius so it never collides with the 4px gutter. Replaces the global
+   outline for this element only — it is not removed, it is restated. */
+.card:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px rgb(0 0 0 / 0.5);
+}
+
+@media (max-width: 1099px) {
+  .card {
+    --project-meta-inset: 13px;
+  }
+}
+
+@media (max-width: 699px) {
+  .card {
+    --project-meta-inset: 11px;
+  }
+
+  .media,
+  .placeholder {
+    object-position: var(--focal-mobile);
+    background-position: var(--focal-mobile);
+  }
+
+  /* Visibility is handled by the capability query above — a phone reaches it
+     through `hover: none`, not through its width. What belongs here is only
+     what is genuinely about a small screen: the type, and the crop. */
+  .metaTitle {
+    font-size: clamp(12px, 3.4cqw, 15px);
+  }
+
+  .metaLine {
+    font-size: clamp(9px, 1.9cqw, 10.5px);
+    letter-spacing: 0.05em;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion.
+
+   Playback is refused in JS, so the stills are what remain. The metadata still
+   appears — it just arrives without travelling. globals.css already collapses
+   the durations; this removes the displacement too.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .meta {
+    transform: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .card:hover .media {
+      transform: none;
+    }
+  }
+}

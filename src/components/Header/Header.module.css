@@ -1,0 +1,157 @@
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-height);
+  padding: 0 14px;
+  border-radius: var(--header-radius);
+  background: var(--background);
+  flex: none;
+}
+
+.left,
+.social {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.link {
+  font-size: var(--nav-size);
+  font-weight: var(--nav-weight);
+  letter-spacing: var(--nav-tracking);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 140ms ease;
+}
+
+/* Route state. No underline, no pill, no dot, no indicator — the only signal
+   is presence: the current page is full black at the nav's Medium weight, the
+   other one sits back in tone and weight. Almost invisible unless looked for.
+   Scoped to the two page links; Instagram / LinkedIn are untouched. */
+.linkCurrent {
+  opacity: 1;
+  font-weight: 500;
+}
+
+.linkInactive {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+/* Full social labels on desktop, two-letter marks in the tight mobile bar. */
+.labelShort {
+  display: none;
+}
+
+/* True viewport-centred wordmark, independent of the side group widths. */
+.logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  /* Recognisable, but still header furniture rather than a hero graphic. */
+  width: 118px;
+}
+
+.logoMark {
+  width: 100%;
+  height: auto;
+}
+
+@media (hover: hover) {
+  .link:hover {
+    opacity: 0.45;
+  }
+
+  /* Hover never dims a page link. The inactive page brightens to full black;
+     the current one is already there and stays put — dimming it would invert
+     the very signal the state exists to carry. Weight does not change on
+     hover either, which would reflow the nav. Social links keep the site's
+     existing dim-on-hover. */
+  .linkInactive:hover,
+  .linkCurrent:hover {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1099px) {
+  .header {
+    padding: 0 12px;
+  }
+
+  .left,
+  .social {
+    gap: 14px;
+  }
+
+  .logo {
+    width: 108px;
+  }
+}
+
+@media (max-width: 699px) {
+  .header {
+    padding: 0 10px;
+  }
+
+  .left,
+  .social {
+    gap: 12px;
+  }
+
+  .labelFull {
+    display: none;
+  }
+
+  .labelShort {
+    display: inline;
+  }
+
+  .logo {
+    width: 94px;
+  }
+}
+
+/* Below ~480px, "About & Contact" needs both a smaller header inset and a
+   near-zero nav gap to clear the centred wordmark at a still-legible
+   (9.5px+) size instead of shrinking type alone down to the point of being
+   hard to read. The inset reduction is scoped to the header only — it does
+   not touch --page-gap, so it does not move the page content grid below. */
+@media (max-width: 479px) {
+  .header {
+    padding: 0 3px;
+  }
+
+  .left {
+    gap: 2px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Touch targets.
+
+   The nav marks are 12px of uppercase type — correct typography, and far too
+   small a thing to hit with a thumb. The header has a fixed height and centres
+   its rows, so padding grows the hit area to the full bar without moving a
+   single glyph or changing the header by a pixel. Verified at 360-430px.
+
+   Pointer devices are left exactly as they were.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .link {
+    padding-block: 14px;
+  }
+
+  /* IG and LI are two-letter marks about 12px wide. Negative margin cancels
+     the horizontal padding exactly, so the hit area grows by 16px and the
+     glyphs do not move: the gaps, the logo centre and the header are
+     unchanged, and only what can be pressed is different. */
+  .social .link {
+    padding-inline: 8px;
+    margin-inline: -8px;
+  }
+}

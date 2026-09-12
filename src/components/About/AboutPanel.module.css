@@ -1,0 +1,221 @@
+.panel {
+  display: grid;
+  /* Group separation: the stacked mobile order needs a clear break between
+     the About copy and the contact block. */
+  gap: clamp(38px, 4vw, 64px);
+  /* Vertically generous, horizontally aligned to the header's own inset so
+     the statement sits on the same edge as HOME and the About copy ends on
+     the same edge as LINKEDIN. One grid across the whole site. */
+  padding: clamp(30px, 5vw, 76px) 14px;
+  border-radius: var(--card-radius);
+  background: var(--background);
+  align-content: start;
+}
+
+/* The brand statement. Present but deliberately NOT a hero headline: it sits
+   in one column of a two-column editorial panel, not across the page. */
+.statement {
+  margin: 0;
+  font-size: clamp(31px, 3.6vw, 56px);
+  /* Medium, not Bold. At this size Bold starts to shout. */
+  font-weight: 500;
+  letter-spacing: -0.021em;
+  line-height: 1.06;
+}
+
+/* Each sentence is its own block, so the two never run together. Stacked
+   (mobile and tablet), the measure — not a hard <br> — breaks each sentence
+   in two:
+
+     Stand beside
+     the idea.
+     Move the work
+     forward.
+
+   On desktop each sentence gets a whole line; see the two-column block. */
+.statementLine {
+  display: block;
+  /* Wide enough for "Stand beside" / "Move the work" (~6.6em at this weight)
+     and too narrow for the following word, at every size the clamp above can
+     produce. In em, not ch: `ch` resolves against the loaded webfont's zero
+     glyph, which did not bind reliably here and left the column width — not
+     the measure — deciding the break. */
+  max-width: 7em;
+}
+
+.body {
+  display: grid;
+  gap: 1.1em;
+  /* Editorial measure for the stacked layouts, where the copy is the full
+     width of the panel and wants the upper end of a comfortable measure.
+     Desktop narrows it — see the two-column block below. */
+  max-width: 72ch;
+}
+
+.paragraph {
+  margin: 0;
+  /* A touch quieter than the statement's neighbourhood: ~15.5px at 1440 and
+     16px at the top end. Below ~1300px this is at the 15px floor. */
+  font-size: clamp(15px, 1.055vw, 16px);
+  line-height: 1.55;
+  letter-spacing: -0.004em;
+}
+
+/* --------------------------------------------------------------------------
+   Contact: EMAIL and PHONE, side by side — a small footer to the statement,
+   not a strip across the page. No rules, no cells, no backgrounds; the gap
+   between the two is the only separator, and it is sized to the content
+   rather than stretched to fill anything.
+   -------------------------------------------------------------------------- */
+.contact {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  column-gap: clamp(32px, 9vw, 56px);
+  row-gap: 20px;
+  font-style: normal;
+  align-content: start;
+}
+
+.contactItem {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+
+.contactLabel {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+/* The same size AND line height as the About copy: the strip reads as part
+   of the same page of type, with the labels alone stepping down — and on
+   desktop, identical line boxes are what put the contact's last baseline on
+   the copy's last baseline. */
+.contactValue {
+  font-size: clamp(14px, 1.055vw, 16px);
+  letter-spacing: -0.004em;
+  line-height: 1.55;
+  justify-self: start;
+}
+
+@media (hover: hover) {
+  a.contactValue:hover {
+    opacity: 0.45;
+  }
+}
+
+a.contactValue {
+  transition: opacity 140ms ease;
+}
+
+@media (max-width: 1099px) {
+  .panel {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (max-width: 699px) {
+  .panel {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  /* Phones: one line per sentence, exactly like desktop.
+
+       Stand beside the idea.
+       Move the work forward.
+
+     The longer line, "Move the work forward.", is ~10.5em wide at this weight
+     and tracking. The width left for it is the viewport less 32px (the 6px
+     page inset and the 10px panel padding on each side), so sizing the type
+     at that width / 10.8 fits it with ~3% to spare at every phone width —
+     30.4px at 360, 36.9px at 430 — rather than shrinking every phone to the
+     narrowest one. No nowrap: on anything narrower than this was measured
+     for, balance breaks each sentence into two even halves instead of
+     overflowing. */
+  .statement {
+    font-size: clamp(26px, calc((100vw - 32px) / 10.8), 40px);
+  }
+
+  .statementLine {
+    max-width: none;
+    text-wrap: balance;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Desktop: statement | About across the top, contact under the statement.
+
+         Stand beside the idea.          Flank Films is an …
+         Move the work forward.          …
+                                         …
+         EMAIL        PHONE              …
+         hello@…      +386 …             … responsibility for the result.
+
+   The About copy spans both rows and so decides the section's height; the
+   contact sits at the bottom of the second row, so both columns close on
+   the same line.
+   -------------------------------------------------------------------------- */
+@media (min-width: 900px) {
+  .panel {
+    /* The About copy keeps a fixed 66ch column on the right edge; the
+       statement gets everything that is left. `ch` here resolves against the
+       same inherited font as the copy's own max-width below, so the track and
+       the column are the same width by construction.
+
+       At 1440 that is enough for one line per sentence, with negative space
+       still open between the statement and the copy. Where it is not enough
+       (the narrow end of desktop), `text-wrap: balance` on each sentence
+       breaks it into two even halves, never a line plus an orphaned word. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 66ch);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "statement body"
+      "contact   body";
+    column-gap: clamp(32px, 5vw, 88px);
+    /* Only a minimum here: the statement and the contact are normally much
+       further apart than this, because the copy is taller than both. */
+    row-gap: clamp(36px, 3vw, 48px);
+    /* The section closes on the last line of type, so the bottom needs less
+       air than the top: the media panels follow sooner. */
+    padding-bottom: clamp(30px, 3.4vw, 52px);
+    align-items: start;
+  }
+
+  .statement {
+    grid-area: statement;
+    /* Optical alignment with the first line of body copy. */
+    margin-top: -0.16em;
+  }
+
+  .statementLine {
+    max-width: none;
+    text-wrap: balance;
+  }
+
+  .body {
+    grid-area: body;
+    /* Pushed to the right edge of the panel, not right-aligned: the lines
+       stay ranged left, the block as a whole moves. Its right edge lands on
+       the same edge as the header's LINKEDIN and the media panels below. */
+    justify-self: end;
+    /* Narrower than the stacked measure — the copy reads as a placed column
+       rather than a wall. */
+    max-width: 66ch;
+  }
+
+  .contact {
+    grid-area: contact;
+    align-self: end;
+    column-gap: clamp(40px, 4.4vw, 80px);
+  }
+
+  /* Exactly the copy's size, so the two last lines share a baseline. */
+  .contactValue {
+    font-size: clamp(15px, 1.055vw, 16px);
+  }
+}

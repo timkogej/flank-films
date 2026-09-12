@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1499 226">
+  <defs>
+    <clipPath id="flank">
+      <path d="M0 0h268v67H93v30h151v60H93v69H0Z"/>
+      <path d="M290 0h93v162h146v64H290Z"/>
+      <path fill-rule="evenodd" d="m538 225 92 1 21-34h102l11 2 14 32h97L762 0H654Zm168-150-29 61h58Z"/>
+      <path d="M888 0v226h92l1-111 104 111h99V0h-87l-1 121L978 0Z"/>
+      <path d="M1206 0v226h92v-50l31-27 60 77h109L1394 96l104-96h-113l-87 83V0Z"/>
+    </clipPath>
+  </defs>
+  <rect width="1499" height="226" fill="#000"/>
+  <image href="pingo-desktop-crop.jpg" width="1499" height="226" preserveAspectRatio="none" clip-path="url(#flank)"/>
+</svg>

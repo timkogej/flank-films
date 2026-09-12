@@ -1,0 +1,371 @@
+/* ==========================================================================
+   DARK LIGHT intro.
+
+   A dark graphite field. A large BLACK FLANK already sitting in it, still,
+   from the first painted frame. One controlled studio reflection travels
+   across its surface and leaves. The mark is black again. The real homepage
+   rises and covers it.
+
+   The wordmark is built as four flat layers inside one silhouette:
+
+     1 base    pure black body
+     2 face    static, very low contrast tonal gradient — the surface itself
+     3 edges   inner-stroke highlight, vertically graded — light from above
+     4 shine   the one moving specular field
+
+   Nothing is embossed, nothing is blurred, nothing is extruded, and the
+   silhouette is the official asset at every layer. Everything tunable is in
+   the block below; the custom properties mirror DARK_LIGHT_SCORE /
+   DARK_LIGHT_TIMING in darkLightConfig.ts one-for-one.
+
+   These values are the approved configuration and they are the only ones the
+   file contains: material A, shine B, the polish luminance profile and the
+   flat BG 1 ground. The alternates each of those was chosen over are gone
+   rather than switched off, so there is no branch here to select the wrong
+   one and no dev-toggle default that production quietly depends on.
+   ========================================================================== */
+
+.stage {
+  /* -- score (ms) ------------------------------------------------------- */
+  --shine-delay: 180ms;
+  --shine-duration: 900ms;
+  --rise-delay: 1300ms;
+  --rise-duration: 640ms;
+
+  /* -- easing ----------------------------------------------------------- */
+  /* Linear, and measured rather than assumed: the field's start and end are
+     solved so the F is touched on the first frame and the K clears on the
+     last, so any ease spends the ends of the pass sitting still. A reflection
+     also has no mass — easing it reads as hesitation, not weight. */
+  --shine-ease: linear;
+  /* A heavy surface taking the frame, not a panel flung at it: ~33% by 130ms,
+     ~74% by 260ms, then a settle that is still visibly moving rather than
+     asymptotically crawling. No overshoot; it arrives exactly at 0. */
+  --rise-ease: cubic-bezier(0.3, 0.25, 0.2, 1);
+
+  /* -- ground -----------------------------------------------------------
+     BG 1: a flat graphite field. Flat is the approved choice — the falloff
+     variant trialled alongside it (BG 2) was not selected. */
+  --graphite: #101010;
+
+  /* -- the object ------------------------------------------------------- */
+  --mark-w: 56vw;
+  /* Optical, not mathematical: a lone wide wordmark on the true centre reads
+     a touch low. Small on purpose. */
+  --mark-lift: 2dvh;
+  --mark-body: #000000;
+
+  /* Static surface response. `face-hi` is the strongest the flat face is ever
+     allowed to lift off black on its own — a few units, not a highlight. */
+  --face-hi: 0.03;
+  --face-mid: 0.012;
+
+  /* Inner edge highlight. `edge-w` is in wordmark user units (viewBox is
+     1499 wide), so the depth cue scales with the mark instead of being
+     re-specified per breakpoint. 6 units is ~1.6 CSS px at 1440. Half of a
+     centred stroke is clipped away by the silhouette, which is what keeps
+     the outline exact and the highlight strictly internal. */
+  --edge-w: 6;
+  --edge-top: 0.22;
+  --edge-mid: 0.05;
+
+  /* -- the reflection ---------------------------------------------------
+     `--shine-span` is the width of the specular field in multiples of the
+     mark's own width — the only unit that keeps the pass feeling the same on
+     a 1920 desktop and a 390 phone.
+
+     `--shine-dark` / `--shine-settle` are positions along that field: where
+     its leading falloff reaches zero, and where its trailing falloff returns
+     to zero. Travelling between exactly those two points spends the whole
+     900ms on light that is actually on the letterforms, and — because BOTH
+     ends are zero — guarantees the mark is black before the pass and black
+     after it. */
+  --shine-angle: 104deg;
+  --shine-span: 3;
+  --shine-dark: 0.88;
+  --shine-settle: 0.2;
+
+  --shine-w: calc(var(--mark-w) * var(--shine-span));
+  --shine-from: calc(-1 * var(--shine-dark) * var(--shine-w));
+  --shine-to: calc(var(--mark-w) - var(--shine-settle) * var(--shine-w));
+}
+
+/* While the sequence runs the stage is exactly one viewport and clips the
+   homepage parked below it. No scrollbar, no document growth, and both
+   declarations are simply gone when it finishes — there is no lock to
+   release and nothing to restore. */
+.running {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   The graphite field.
+   -------------------------------------------------------------------------- */
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--graphite);
+  display: grid;
+  place-items: center;
+  /* Decorative only — never intercepts a click. */
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   The object.
+
+   `.stack` is the box the wordmark occupies. `.mark` carries the silhouette
+   as a CSS mask and holds the three flat fills; `.edges` is a sibling that
+   carries the inner-stroke highlight and confines itself with its own
+   clipPath. They are siblings rather than nested so the edge line is
+   antialiased once, against the geometry, instead of twice.
+   -------------------------------------------------------------------------- */
+.stack {
+  position: relative;
+  width: var(--mark-w);
+  aspect-ratio: 1499 / 226;
+  margin-bottom: var(--mark-lift);
+}
+
+.mark {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: url("/brand/flank-wordmark-white.svg");
+  mask-image: url("/brand/flank-wordmark-white.svg");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* Layer 1 — the body. Black, and it stays black. */
+.base {
+  position: absolute;
+  inset: 0;
+  background: var(--mark-body);
+}
+
+/* Layer 2 — the surface.
+
+   One very low contrast gradient running down and slightly right, so the
+   upper part of the face sits a few units above black and the lower part is
+   black. This is the whole reason the static frame does not read as a flat
+   SVG: it is not a highlight, and at these values it is not consciously
+   visible — it just stops the object being a hole. */
+.face {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    168deg,
+    rgb(255 255 255 / var(--face-hi)) 0%,
+    rgb(255 255 255 / var(--face-mid)) 44%,
+    rgb(255 255 255 / 0) 82%
+  );
+}
+
+/* Layer 4 — the reflection.
+
+   A single wide luminance field, wider than the mark, translated across it on
+   one axis. The gradient is painted once and never touched again; only a
+   transform animates, so the pass costs one composited layer and no repaints.
+
+   Read the stops right-to-left, the order the mark experiences them: 100% is
+   the leading edge (nothing), a long broad pre-reflection rises into a small
+   specular core, then a shorter falloff returns to nothing at the trailing
+   end. Both ends are zero, so this layer contributes exactly nothing before
+   the pass and exactly nothing after it. */
+.shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--shine-w);
+  transform: translate3d(var(--shine-from), 0, 0);
+  animation: shinePass var(--shine-duration) var(--shine-ease)
+    var(--shine-delay) both;
+  /* The shoulders here are the POLISH values — roughly a third below the
+     profile they replaced — so the core carries the highlight and the
+     surrounding face stays near-black instead of lifting toward grey. Peak is
+     0.55, and it is only ~9% of the mark wide. */
+  background-image: linear-gradient(
+    var(--shine-angle),
+    rgb(255 255 255 / 0) 0%,
+    rgb(255 255 255 / 0) 20%,
+    rgb(255 255 255 / 0.007) 25%,
+    rgb(255 255 255 / 0.021) 31%,
+    rgb(255 255 255 / 0.045) 37%,
+    rgb(255 255 255 / 0.078) 42%,
+    rgb(255 255 255 / 0.135) 46%,
+    rgb(255 255 255 / 0.26) 48.5%,
+    rgb(255 255 255 / 0.44) 49.8%,
+    rgb(255 255 255 / 0.55) 50.6%,
+    rgb(255 255 255 / 0.43) 51.6%,
+    rgb(255 255 255 / 0.26) 53.5%,
+    rgb(255 255 255 / 0.15) 56.5%,
+    rgb(255 255 255 / 0.092) 60.5%,
+    rgb(255 255 255 / 0.058) 65.5%,
+    rgb(255 255 255 / 0.034) 71%,
+    rgb(255 255 255 / 0.016) 77%,
+    rgb(255 255 255 / 0.005) 83%,
+    rgb(255 255 255 / 0) 88%,
+    rgb(255 255 255 / 0) 100%
+  );
+  /* Deliberately no `will-change`. A transform animation is promoted on its
+     own, and pinning an extra composited layer inside a masked element is the
+     reliable way to make WebKit drop the mask mid-transform. */
+}
+
+/* Layer 3 — the edges.
+
+   An inner stroke: the path is stroked at `--edge-w` and clipped by its own
+   geometry, so the outer half is discarded and the silhouette stays exactly
+   the official outline. The stroke is painted with a gradient that runs down
+   the mark, so the top edge of every letter catches light and the bottom edge
+   of every letter does not — which is what makes it read as one light source
+   above the object rather than as a vector outline.
+
+   It sits on top of the reflection on purpose: it stays crisp at peak, and
+   the internal structure of the mark remains legible when the face is at its
+   brightest. */
+.edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.edgeStroke {
+  fill: none;
+  stroke-width: var(--edge-w);
+}
+
+.edgeTop {
+  stop-color: #ffffff;
+  stop-opacity: var(--edge-top);
+}
+
+.edgeMid {
+  stop-color: #ffffff;
+  stop-opacity: var(--edge-mid);
+}
+
+.edgeLow {
+  stop-color: #ffffff;
+  stop-opacity: 0;
+}
+
+/* --------------------------------------------------------------------------
+   The real homepage, rising.
+   -------------------------------------------------------------------------- */
+.riser {
+  position: relative;
+  z-index: 1;
+  /* The rising surface must be opaque, or the page's own inset and the mosaic
+     gutters show graphite through them while it travels and then pop to white
+     when the curtain unmounts. White-on-white once the intro is over, so it
+     changes nothing about the finished page. */
+  background: var(--background);
+}
+
+.running .riser {
+  will-change: transform;
+  animation: pageRise var(--rise-duration) var(--rise-ease) var(--rise-delay)
+    both;
+}
+
+@keyframes shinePass {
+  from {
+    transform: translate3d(var(--shine-from), 0, 0);
+  }
+  to {
+    transform: translate3d(var(--shine-to), 0, 0);
+  }
+}
+
+@keyframes pageRise {
+  from {
+    transform: translate3d(0, 100dvh, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes curtainOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tablet.
+   -------------------------------------------------------------------------- */
+@media (max-width: 1099px) {
+  .stage {
+    --mark-w: 64vw;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Phone.
+
+   Same object, not a scaled-down picture of it. The reflection field is
+   broadened relative to the mark and given slightly more time, because a
+   small screen is exactly where a specular highlight turns into a sparkle.
+   The edge stroke is thickened in user units to survive the smaller scale.
+   -------------------------------------------------------------------------- */
+@media (max-width: 699px) {
+  .stage {
+    --mark-w: 82vw;
+    --mark-lift: 1.4dvh;
+    --shine-angle: 101deg;
+    --shine-duration: 940ms;
+    --rise-delay: 1340ms;
+    --rise-duration: 620ms;
+  }
+
+  /* Thickened in user units so the depth cue survives the smaller scale, but
+     only just: pushed further it stops reading as a lit edge and starts
+     reading as an outline drawn around the letters. */
+  /* The edge is thickened in user units so the depth cue survives the smaller
+     scale, but only just: pushed further it stops reading as a lit edge and
+     starts reading as an outline drawn around the letters. */
+  .stage {
+    --edge-w: 8;
+    --shine-span: 3.6;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion.
+
+   The object is already static in the full version, so the reduced path is
+   simply the same frame without the reflection: graphite, black FLANK, a
+   brief hold, then the curtain is taken away over a page that never moved.
+   globals.css collapses every animation to 0.01ms under this query, so the
+   one rule that still needs a duration re-asserts its own.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .shine {
+    display: none;
+  }
+
+  /* The page never moves; it is at its final position from the first frame. */
+  .running .riser {
+    animation: none !important;
+    will-change: auto;
+  }
+
+  .curtain {
+    z-index: 2;
+    animation: curtainOut 200ms cubic-bezier(0.33, 1, 0.68, 1) 320ms both !important;
+  }
+}
