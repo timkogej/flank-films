@@ -24,8 +24,10 @@ import styles from "./FlankIntroV2Prototype.module.css";
 /**
  * FLANK intro V2 — PROTOTYPE. Step 2: the choreography.
  *
- * The production `FlankIntro` is untouched and still owns the homepage. This
- * lives only at /intro-v2-test and stops where Step 3 begins: black, a white
+ * The production intro is untouched and still owns the homepage — today that
+ * is `IntroDarkLight`, not the `FlankIntro` this was written beside. This had
+ * one route, /intro-v2-test, removed before the first deploy; it is now
+ * unreachable source. It stops where Step 3 begins: black, a white
  * FLANK, film entering the mark, Pingo, cut, OTP, cut, Bohinj — and then it
  * simply keeps running.
  *

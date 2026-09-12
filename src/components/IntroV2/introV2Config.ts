@@ -2,8 +2,14 @@
  * FLANK intro V2 — PROTOTYPE ONLY. Step 2: the choreography inside the mark.
  *
  * Nothing here is imported by the production intro, the homepage, the mosaic or
- * any project route. The whole `IntroV2` folder plus `src/app/intro-v2-test`
- * can be deleted in one move with no other edit.
+ * any project route. `src/app/intro-v2-test` — the only thing that ever
+ * imported it — was removed before the first deploy, so this folder is now
+ * unreachable source: it ships in no bundle and there is no URL that renders
+ * it. It is kept for future experimentation and can be deleted in one move
+ * with no other edit, which is also what would retire the archived media it is
+ * the last reader of (see §step1Reference below).
+ *
+ * To replay it, restore a page that renders `FlankIntroV2Prototype`.
  *
  * This file is the score. Every number the sequence obeys — when the white mark
  * arrives, when film enters it, when each cut lands, how each clip is framed —
@@ -206,7 +212,10 @@ export const INTRO_V2_SHOTS: IntroV2Shot[] = [
  * with it. So the clip is named directly: it is a specific archived file, not
  * a project, which is what it has actually been since the mapping changed. The
  * derivatives stay in place for exactly this reason; see
- * public/media/projects/README.md. The crop below is unchanged.
+ * public/media/projects/README.md, which records that they were once deleted
+ * in error and had to be regenerated from the master. This function is their
+ * last reader in source: retiring this prototype is what would make
+ * public/media/projects/bohinj/ genuinely dead. The crop below is unchanged.
  */
 function step1Reference() {
   const src = "/media/projects/bohinj/preview.mp4";

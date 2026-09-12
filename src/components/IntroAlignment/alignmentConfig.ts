@@ -1,10 +1,15 @@
 /**
  * FLANK intro — ALIGNMENT LOCK prototype. PROTOTYPE ONLY.
  *
- * Nothing here is imported by the production intro (`src/components/Intro`),
- * the Intro V2 video prototype (`src/components/IntroV2`), the homepage, the
- * mosaic or any project route. This folder plus `src/app/intro-alignment-test`
- * can be deleted in one move with no other edit.
+ * Nothing here is imported by the production intro (today
+ * `src/components/IntroDarkLight`), the Intro V2 video prototype
+ * (`src/components/IntroV2`), the homepage, the mosaic or any project route.
+ * `src/app/intro-alignment-test` — the only thing that ever imported it — was
+ * removed before the first deploy, so this folder is now unreachable source:
+ * it ships in no bundle and there is no URL that renders it. It is kept for
+ * future experimentation and can be deleted in one move with no other edit.
+ *
+ * It reads only the shared brand wordmark, so retiring it frees no media.
  *
  * ── THE LAW ────────────────────────────────────────────────────────────────
  * Two large surfaces cross a fixed point, on different axes:
