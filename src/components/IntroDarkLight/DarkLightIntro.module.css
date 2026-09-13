@@ -53,12 +53,14 @@
      BG 1: a flat graphite field. Flat is the approved choice — the falloff
      variant trialled alongside it (BG 2) was not selected. */
   /* Lifted from #101010, which left the black mark almost indistinguishable
-     from its ground before the light arrived. Tested at #1E1E1E / #202020 /
-     #222222 (and #1A1A1A) with the material unchanged: #1E1E1E doubles the
-     mark's separation from the ground at rest and is the value at which the
-     mid-shine face merges least with it, while still reading as deep
-     graphite rather than grey. */
-  --graphite: #1e1e1e;
+     from its ground before the light arrived, then brought a step back down
+     from #1E1E1E, which read slightly light. Tested at #1A1A1A / #1B1B1B /
+     #1C1C1C with the material unchanged: #1C1C1C keeps nearly all of the
+     lighter ground's separation from the mark at rest (26 levels to its 28;
+     the original had 14), and it is the darkest of the three at which the
+     mid-shine face does not start merging back into the ground on a phone —
+     #1B1B1B and #1A1A1A return to the original's level there. */
+  --graphite: #1c1c1c;
 
   /* -- the object ------------------------------------------------------- */
   --mark-w: 56vw;

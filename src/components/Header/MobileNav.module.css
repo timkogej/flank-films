@@ -115,6 +115,16 @@
   pointer-events: none;
 }
 
+/* At rest the shell is present but not shown. `visibility` rather than an
+   unmount or `display: none`: the element and its wordmark stay laid out,
+   loaded and decoded, so the frame that reveals them already contains them;
+   and a hidden shell takes no presses, no focus and no part in the
+   accessibility tree. Nothing transitions `visibility`, so it is immediate
+   both ways. */
+.panel[data-visible="false"] {
+  visibility: hidden;
+}
+
 /* Belt and braces with the resize listener in the component: a viewport that
    grows past the breakpoint while the menu is open cannot leave a scrim over
    the wide layout. */
@@ -214,7 +224,10 @@
    flash of the page between them.
    -------------------------------------------------------------------------- */
 .tiles {
-  --tile-height: 104px;
+  /* Compact on purpose: the pair should read as a quiet index under the
+     header, not as a pair of app buttons. 80px is still well over a
+     comfortable thumb target. */
+  --tile-height: 80px;
 
   display: grid;
 }
@@ -230,17 +243,17 @@
   pointer-events: none;
 }
 
-/* Large editorial type set low in a plain white field — a spread's running
-   head, not a button. */
+/* Editorial type set low in a plain white field — a spread's running head,
+   not a button. One step above the header's marks, and no louder. */
 .tile {
   display: flex;
   align-items: flex-end;
-  padding: 0 var(--header-inset) 16px;
+  padding: 0 var(--header-inset) 15px;
   border-radius: var(--card-radius);
   background: var(--background);
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 500;
-  letter-spacing: -0.005em;
+  letter-spacing: 0.02em;
   line-height: 1;
   text-transform: uppercase;
   -webkit-tap-highlight-color: transparent;
@@ -248,7 +261,7 @@
   /* The reveal: each tile lifts a few pixels into place, the second a beat
      after the first. Closing takes both away together. */
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
   transition:
     opacity var(--nav-tile-out) var(--nav-ease),
     transform var(--nav-tile-out) var(--nav-ease);
@@ -286,8 +299,8 @@
 /* The current page, stated once and quietly: a small mark at the end of its
    tile. No pill, no fill, no colour. */
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--foreground);
   flex: none;
@@ -296,7 +309,7 @@
 
 /* Leaves the site. Typographic, and small beside the word it qualifies. */
 .out {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 400;
   opacity: 0.45;
 }
@@ -316,6 +329,6 @@
 /* The narrowest phones give up a little tile height, never type size. */
 @media (max-width: 374px) {
   .tiles {
-    --tile-height: 96px;
+    --tile-height: 76px;
   }
 }

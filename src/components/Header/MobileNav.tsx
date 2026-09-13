@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -25,7 +26,7 @@ import styles from "./MobileNav.module.css";
  *   open    scrim fades in; the two tiles lift into place 50ms apart (350ms)
  *   switch  the current words leave, the new words arrive in the SAME tiles,
  *           staggered like the reveal (~365ms); tiles and scrim do not move
- *   close   tiles and scrim go together, no stagger (260ms), then unmount
+ *   close   tiles and scrim go together, no stagger (260ms), then hide
  *   labels  MENU + ↔ CLOSE – / SOCIAL + ↔ CLOSE – (220ms), on every change
  */
 const NAV_MOTION = {
@@ -59,6 +60,16 @@ const GROUP_ID = { menu: "flank-mobile-nav-menu", social: "flank-mobile-nav-soci
  * in it.
  */
 type Mode = "menu" | "social";
+
+/**
+ * False on the server and while hydrating, true on every client render after.
+ * The shell is portalled into <body>, which the server cannot render and the
+ * intro's hydration must not see — so it mounts on the first render after
+ * hydration, and then stays.
+ */
+const noSubscription = () => () => {};
+const onClient = () => true;
+const onServer = () => false;
 
 function reducedMotion(): boolean {
   return (
@@ -126,7 +137,7 @@ function swap(
  *
  * The two marks open two different things inside ONE shell:
  *
- *   menu     CLOSE –   FLANK   SOCIAL +      HOME / ABOUT
+ *   menu     CLOSE –   FLANK   SOCIAL +      HOME / ABOUT & CONTACT
  *   social   MENU +    FLANK   CLOSE –       INSTAGRAM / LINKEDIN
  *
  * The shell draws its own bar at the header's height, insets and wordmark, so
@@ -134,9 +145,22 @@ function swap(
  * Pressing the other mark while open changes the mode in place: the scrim,
  * the bar, the tiles and the scroll lock all stay exactly as they are and only
  * the words move.
+ *
+ * The shell is mounted ONCE, hidden, right after hydration — never per open.
+ * Its bar is opaque and sits exactly over the real header, so whatever
+ * wordmark it carries is the only one on screen while it is up. When the
+ * shell used to be created on each press, that wordmark was a brand-new <img>,
+ * and WebKit does not paint a new image element in the frame it is inserted
+ * (image data is resolved in a later task, from cache or not, eager or not):
+ * the first frame of every open showed the white bar and its labels with no
+ * FLANK in it. Mounted up front, the image has long been loaded and decoded
+ * by the first press, keeps one DOM identity through every open, close and
+ * switch, and opening changes nothing about it but `visibility`.
  */
 export function MobileNav({ current }: { current: PageKey }) {
-  /** Kept mounted through the close transition so it can fade out. */
+  const hydrated = useSyncExternalStore(noSubscription, onClient, onServer);
+  /** The shell is showing — including through its close transition. Hidden
+   *  (not unmounted) otherwise; see the note above. */
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   /** Which content the shell is showing. Survives closing, so the words do
@@ -177,7 +201,7 @@ export function MobileNav({ current }: { current: PageKey }) {
     setScrolled(window.scrollY > 0);
     setMode(next);
     setVisible(true);
-    // Two frames: the shell mounts in its closed state and only then is told
+    // Two frames: the shell is revealed in its closed state and only then told
     // to open, so the transitions have something to move from. One frame is
     // enough in Chrome and is not enough in Safari.
     requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
@@ -429,6 +453,8 @@ export function MobileNav({ current }: { current: PageKey }) {
       id={PANEL_ID}
       className={styles.panel}
       data-state={open ? "open" : "closed"}
+      data-visible={visible}
+      aria-hidden={visible ? undefined : true}
       data-scrolled={scrolled ? "" : undefined}
       role="dialog"
       aria-modal="true"
@@ -464,11 +490,14 @@ export function MobileNav({ current }: { current: PageKey }) {
             aria-label="FLANK — home"
             onClick={closeForNavigation}
           >
+            {/* Eager: the shell is hidden until pressed, and a lazy image in
+                it would still be unloaded at the one moment it matters. */}
             <Image
               src="/brand/flank-wordmark-black.svg"
               alt="FLANK"
               width={1499}
               height={226}
+              loading="eager"
             />
           </Link>
 
@@ -496,7 +525,7 @@ export function MobileNav({ current }: { current: PageKey }) {
                 onClick={closeForNavigation}
               >
                 <span className={styles.word} data-word>
-                  {page.short}
+                  {page.label}
                   {page.key === current && (
                     <span className={styles.dot} aria-hidden="true" />
                   )}
@@ -563,11 +592,9 @@ export function MobileNav({ current }: { current: PageKey }) {
         {markText("Social", "+")}
       </button>
 
-      {/* A portal needs a document, and `visible` can only have been set by a
-          press — so by the time this renders, one exists. On the server and in
-          the hydrating render it is false, which is also what keeps the panel
-          out of the HTML the intro hydrates. */}
-      {visible && createPortal(panel, document.body)}
+      {/* Never in the server HTML or the hydrating render — `hydrated` is
+          false for both — and present, hidden, from the render after. */}
+      {hydrated && createPortal(panel, document.body)}
     </div>
   );
 }

@@ -25,21 +25,12 @@ export const social = {
  *
  * Two destinations, because the site has two. The header renders this on a
  * wide bar and the phone menu renders the same list in its own shape — one
- * array, so a page can never appear in one and not the other.
- *
- * `label` is the wide-bar wording and `short` the phone wording. They differ
- * for exactly one entry: a phone bar says ABOUT, where the desktop bar has the
- * room to say ABOUT & CONTACT. Same href either way — the About page carries
- * the contact details, so the shorter word loses nothing.
+ * array, and one wording, so a page can never be named differently in the
+ * two. The About page carries the contact details, which is why it says so.
  */
 export const pages = [
-  { key: "home", href: "/", label: "Home", short: "Home" },
-  {
-    key: "about",
-    href: "/about",
-    label: "About & Contact",
-    short: "About",
-  },
+  { key: "home", href: "/", label: "Home" },
+  { key: "about", href: "/about", label: "About & Contact" },
 ] as const;
 
 export type PageKey = (typeof pages)[number]["key"];
