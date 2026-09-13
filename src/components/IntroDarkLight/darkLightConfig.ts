@@ -1,5 +1,5 @@
 /**
- * DARK LIGHT intro — the whole score in one table.
+ * FLANK light-surface intro — the whole score in one table.
  *
  * Every number that decides how the piece feels lives here (all pacing) or in
  * the custom properties at the top of DarkLightIntro.module.css (the look). Nothing is tuned
@@ -34,12 +34,16 @@ export const DARK_LIGHT_MODE: "every-load" | "off" = "every-load";
  * Choreography, in milliseconds — the ONLY place the intro's pacing is
  * written down. Four beats, played back to back, one sequence:
  *
- *   initialHold    graphite field, black FLANK already sitting in it, and
+ *   initialHold    light field, black FLANK already sitting in it, and
  *                  nothing moving. Long enough to register the mark as the
  *                  mark before anything happens to it.
  *   shineDuration  the one reflection, from touching the F to clearing the K.
  *   postShineHold  the mark black again, still — a beat, not a second scene.
  *   riseDuration   the real page rising from the bottom edge until seated.
+ *
+ * The surface settle overlaps those four beats. It begins shortly before the
+ * rise and lowers the ambient field almost to white as the real page covers it;
+ * it does not add time to the score.
  *
  * The mark does not arrive. It is already there in the first painted frame,
  * at full size and full contrast, and it never moves — so there is no reveal
@@ -70,12 +74,16 @@ export const INTRO_SCORE = {
     shineDuration: 1200,
     postShineHold: 320,
     riseDuration: 740,
+    surfaceSettleLead: 480,
+    surfaceSettleDuration: 700,
   },
   phone: {
     initialHold: 360,
     shineDuration: 1160,
     postShineHold: 300,
     riseDuration: 700,
+    surfaceSettleLead: 460,
+    surfaceSettleDuration: 660,
   },
 } as const;
 
@@ -86,15 +94,26 @@ export type IntroProfile = (typeof INTRO_SCORE)[keyof typeof INTRO_SCORE];
  * judged in ("the reflection leaves the K at 1.58s") — and the delays CSS
  * needs. Derived, never written down twice.
  *
- *   desktop   0 → 380 hold · 380 → 1580 shine · 1580 → 1900 hold · 1900 → 2640 rise
- *   phone     0 → 360 hold · 360 → 1520 shine · 1520 → 1820 hold · 1820 → 2520 rise
+ *   desktop   0 → 380 hold · 380 → 1580 shine · 1420 → 2120 settle ·
+ *             1580 → 1900 hold · 1900 → 2640 rise
+ *   phone     0 → 360 hold · 360 → 1520 shine · 1360 → 2020 settle ·
+ *             1520 → 1820 hold · 1820 → 2520 rise
  */
 export function introMarks(p: IntroProfile) {
   const shineStart = p.initialHold;
   const shineEnd = shineStart + p.shineDuration;
   const riseStart = shineEnd + p.postShineHold;
   const riseEnd = riseStart + p.riseDuration;
-  return { shineStart, shineEnd, riseStart, riseEnd } as const;
+  const surfaceSettleStart = riseStart - p.surfaceSettleLead;
+  const surfaceSettleEnd = surfaceSettleStart + p.surfaceSettleDuration;
+  return {
+    shineStart,
+    shineEnd,
+    surfaceSettleStart,
+    surfaceSettleEnd,
+    riseStart,
+    riseEnd,
+  } as const;
 }
 
 /**

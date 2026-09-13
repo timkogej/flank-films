@@ -1,3 +1,4 @@
+import { ArrowUpRight } from "@/components/ArrowUpRight/ArrowUpRight";
 import { aboutParagraphs, brandStatement, contact } from "@/data/about";
 
 import styles from "./AboutPanel.module.css";
@@ -68,7 +69,7 @@ export function AboutPanel() {
           <a className={styles.contactEmail} href={`mailto:${contact.email}`}>
             <span className={styles.contactEmailText}>{contact.email}</span>
             <span className={styles.contactArrow} aria-hidden="true">
-              ↗
+              <ArrowUpRight />
             </span>
           </a>
 

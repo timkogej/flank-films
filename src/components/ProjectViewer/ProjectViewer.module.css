@@ -328,6 +328,10 @@
 .closeButton,
 .control {
   appearance: none;
+  /* WebKit's default tap highlight is a translucent dark box over a tapped
+     control — on iOS a flash of exactly the square these marks must never
+     wear. Scoped to the viewer's own controls. */
+  -webkit-tap-highlight-color: transparent;
   border: 0;
   background: none;
   padding: 0;

@@ -1,10 +1,10 @@
 /* ==========================================================================
-   DARK LIGHT intro.
+   FLANK light-surface intro.
 
-   A dark graphite field. A large BLACK FLANK already sitting in it, still,
-   from the first painted frame. One controlled studio reflection travels
-   across its surface and leaves. The mark is black again. The real homepage
-   rises and covers it.
+   A nearly-white field carrying broad, diffused studio light. A BLACK FLANK
+   is already sitting in it, still, from the first painted frame. One controlled
+   reflection travels across the satin-black face and leaves. The ambient field
+   resolves toward white while the real page rises and covers the mark.
 
    The wordmark is built as four flat layers inside one silhouette:
 
@@ -13,17 +13,16 @@
      3 edges   inner-stroke highlight, vertically graded — light from above
      4 shine   the one moving specular field
 
-   Nothing is embossed, nothing is blurred, nothing is extruded, and the
-   silhouette is the official asset at every layer. Everything tunable is in
+   Nothing is embossed or extruded, and the silhouette is the official asset
+   at every layer. The background uses fixed gradients on oversized layers and
+   animates transforms only; there is no canvas, video or rendering loop.
+   Everything tunable is in
    the block below — except pacing, which is not written in this file at all:
    every duration and delay comes from INTRO_SCORE in darkLightConfig.ts, set
    on the stage as `--desktop-*` / `--phone-*` properties by the component.
 
-   These values are the approved configuration and they are the only ones the
-   file contains: material A, shine B, the polish luminance profile and the
-   flat BG 1 ground. The alternates each of those was chosen over are gone
-   rather than switched off, so there is no branch here to select the wrong
-   one and no dev-toggle default that production quietly depends on.
+   These values are the final production configuration and the file contains no
+   runtime selector or development variant.
    ========================================================================== */
 
 .stage {
@@ -32,6 +31,8 @@
      element. This only selects the profile; the phone block re-points them. */
   --shine-delay: var(--desktop-shine-delay);
   --shine-duration: var(--desktop-shine-duration);
+  --settle-delay: var(--desktop-settle-delay);
+  --settle-duration: var(--desktop-settle-duration);
   --rise-delay: var(--desktop-rise-delay);
   --rise-duration: var(--desktop-rise-duration);
 
@@ -49,18 +50,9 @@
      asymptotically crawling. No overshoot; it arrives exactly at 0. */
   --rise-ease: cubic-bezier(0.3, 0.25, 0.2, 1);
 
-  /* -- ground -----------------------------------------------------------
-     BG 1: a flat graphite field. Flat is the approved choice — the falloff
-     variant trialled alongside it (BG 2) was not selected. */
-  /* Lifted from #101010, which left the black mark almost indistinguishable
-     from its ground before the light arrived, then brought a step back down
-     from #1E1E1E, which read slightly light. Tested at #1A1A1A / #1B1B1B /
-     #1C1C1C with the material unchanged: #1C1C1C keeps nearly all of the
-     lighter ground's separation from the mark at rest (26 levels to its 28;
-     the original had 14), and it is the darkest of the three at which the
-     mid-shine face does not start merging back into the ground on a phone —
-     #1B1B1B and #1A1A1A return to the original's level there. */
-  --graphite: #1c1c1c;
+  /* Restrained neutral material: the field reads white at a glance, with only
+     enough luminance range to suggest diffused studio light. */
+  --surface: #fafaf8;
 
   /* -- the object ------------------------------------------------------- */
   --mark-w: 56vw;
@@ -69,10 +61,10 @@
   --mark-lift: 2dvh;
   --mark-body: #000000;
 
-  /* Static surface response. `face-hi` is the strongest the flat face is ever
+  /* Static mark response. `face-hi` is the strongest the flat face is ever
      allowed to lift off black on its own — a few units, not a highlight. */
-  --face-hi: 0.03;
-  --face-mid: 0.012;
+  --face-hi: 0.018;
+  --face-mid: 0.006;
 
   /* Inner edge highlight. `edge-w` is in wordmark user units (viewBox is
      1499 wide), so the depth cue scales with the mark instead of being
@@ -80,8 +72,8 @@
      centred stroke is clipped away by the silhouette, which is what keeps
      the outline exact and the highlight strictly internal. */
   --edge-w: 6;
-  --edge-top: 0.22;
-  --edge-mid: 0.05;
+  --edge-top: 0.12;
+  --edge-mid: 0.025;
 
   /* -- the reflection ---------------------------------------------------
      `--shine-span` is the width of the specular field in multiples of the
@@ -105,26 +97,93 @@
 }
 
 /* While the sequence runs the stage is exactly one viewport and clips the
-   homepage parked below it. No scrollbar, no document growth, and both
+   page parked below it. No scrollbar, no document growth, and both
    declarations are simply gone when it finishes — there is no lock to
    release and nothing to restore. */
-.running {
+.active {
   height: 100dvh;
   overflow: hidden;
 }
 
+.active .riser {
+  transform: translate3d(0, 100dvh, 0);
+}
+
 /* --------------------------------------------------------------------------
-   The graphite field.
+   The light field.
    -------------------------------------------------------------------------- */
 .curtain {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: var(--graphite);
+  background: var(--surface);
   display: grid;
   place-items: center;
   /* Decorative only — never intercepts a click. */
   pointer-events: none;
+}
+
+.lightField {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 1;
+}
+
+.lightMass {
+  position: absolute;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+}
+
+.lightMassA {
+  inset: -45% -30%;
+  background: radial-gradient(
+    ellipse at 32% 42%,
+    rgb(255 255 255 / 0.98) 0%,
+    rgb(255 255 255 / 0.72) 25%,
+    rgb(232 232 229 / 0.54) 58%,
+    rgb(250 250 248 / 0) 78%
+  );
+}
+
+.lightMassB {
+  inset: -55% -45%;
+  background: radial-gradient(
+    ellipse at 70% 56%,
+    rgb(230 230 227 / 0.5) 0%,
+    rgb(239 239 236 / 0.32) 34%,
+    rgb(250 250 248 / 0) 70%
+  );
+}
+
+.lightMassC {
+  inset: -35% -50%;
+  opacity: 0.42;
+  background: linear-gradient(
+    112deg,
+    rgb(255 255 255 / 0) 24%,
+    rgb(255 255 255 / 0.72) 43%,
+    rgb(235 235 232 / 0.34) 62%,
+    rgb(255 255 255 / 0) 79%
+  );
+}
+
+.started .lightMassA {
+  animation: driftA var(--rise-delay) linear both;
+}
+
+.started .lightMassB {
+  animation: driftB var(--rise-delay) linear both;
+}
+
+.started .lightMassC {
+  animation: driftC var(--rise-delay) linear both;
+}
+
+.started .lightField {
+  animation: surfaceSettle var(--settle-duration) cubic-bezier(0.4, 0, 0.2, 1)
+    var(--settle-delay) both;
 }
 
 /* --------------------------------------------------------------------------
@@ -199,8 +258,6 @@
   height: 100%;
   width: var(--shine-w);
   transform: translate3d(var(--shine-from), 0, 0);
-  animation: shinePass var(--shine-duration) var(--shine-ease)
-    var(--shine-delay) both;
   /* The shoulders here are the POLISH values — roughly a third below the
      profile they replaced — so the core carries the highlight and the
      surrounding face stays near-black instead of lifting toward grey. Peak is
@@ -214,15 +271,15 @@
     rgb(255 255 255 / 0.045) 37%,
     rgb(255 255 255 / 0.078) 42%,
     rgb(255 255 255 / 0.135) 46%,
-    rgb(255 255 255 / 0.26) 48.5%,
-    rgb(255 255 255 / 0.44) 49.8%,
-    rgb(255 255 255 / 0.55) 50.6%,
-    rgb(255 255 255 / 0.43) 51.6%,
-    rgb(255 255 255 / 0.26) 53.5%,
-    rgb(255 255 255 / 0.15) 56.5%,
-    rgb(255 255 255 / 0.092) 60.5%,
-    rgb(255 255 255 / 0.058) 65.5%,
-    rgb(255 255 255 / 0.034) 71%,
+    rgb(255 255 255 / 0.17) 48.5%,
+    rgb(255 255 255 / 0.29) 49.8%,
+    rgb(255 255 255 / 0.38) 50.6%,
+    rgb(255 255 255 / 0.3) 51.6%,
+    rgb(255 255 255 / 0.18) 53.5%,
+    rgb(255 255 255 / 0.1) 56.5%,
+    rgb(255 255 255 / 0.06) 60.5%,
+    rgb(255 255 255 / 0.037) 65.5%,
+    rgb(255 255 255 / 0.021) 71%,
     rgb(255 255 255 / 0.016) 77%,
     rgb(255 255 255 / 0.005) 83%,
     rgb(255 255 255 / 0) 88%,
@@ -231,6 +288,11 @@
   /* Deliberately no `will-change`. A transform animation is promoted on its
      own, and pinning an extra composited layer inside a masked element is the
      reliable way to make WebKit drop the mask mid-transform. */
+}
+
+.started .shine {
+  animation: shinePass var(--shine-duration) var(--shine-ease)
+    var(--shine-delay) both;
 }
 
 /* Layer 3 — the edges.
@@ -280,16 +342,52 @@
   position: relative;
   z-index: 1;
   /* The rising surface must be opaque, or the page's own inset and the mosaic
-     gutters show graphite through them while it travels and then pop to white
+     gutters show the ambient field through them while it travels
      when the curtain unmounts. White-on-white once the intro is over, so it
      changes nothing about the finished page. */
   background: var(--background);
 }
 
-.running .riser {
+.started .riser {
   will-change: transform;
   animation: pageRise var(--rise-duration) var(--rise-ease) var(--rise-delay)
     both;
+}
+
+@keyframes driftA {
+  from {
+    transform: translate3d(-1.5%, -0.5%, 0) scale(1.01);
+  }
+  to {
+    transform: translate3d(3%, 1.5%, 0) scale(1.035);
+  }
+}
+
+@keyframes driftB {
+  from {
+    transform: translate3d(2%, -1%, 0) scale(1.02);
+  }
+  to {
+    transform: translate3d(-2.5%, 2%, 0) scale(1.045);
+  }
+}
+
+@keyframes driftC {
+  from {
+    transform: translate3d(-2.5%, 0, 0);
+  }
+  to {
+    transform: translate3d(2%, -1%, 0);
+  }
+}
+
+@keyframes surfaceSettle {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.06;
+  }
 }
 
 @keyframes shinePass {
@@ -344,6 +442,8 @@
     --shine-angle: 101deg;
     --shine-delay: var(--phone-shine-delay);
     --shine-duration: var(--phone-shine-duration);
+    --settle-delay: var(--phone-settle-delay);
+    --settle-duration: var(--phone-settle-duration);
     --rise-delay: var(--phone-rise-delay);
     --rise-duration: var(--phone-rise-duration);
   }
@@ -355,13 +455,22 @@
     --edge-w: 8;
     --shine-span: 3.6;
   }
+
+  .lightMassC {
+    display: none;
+  }
+
+  .lightMassA,
+  .lightMassB {
+    opacity: 0.8;
+  }
 }
 
 /* --------------------------------------------------------------------------
    Reduced motion.
 
    The object is already static in the full version, so the reduced path is
-   simply the same frame without the reflection: graphite, black FLANK, a
+   simply the same frame without the reflection: light field, black FLANK, a
    brief hold, then the curtain is taken away over a page that never moved.
    globals.css collapses every animation to 0.01ms under this query, so the
    one rule that still needs a duration re-asserts its own.
@@ -372,12 +481,14 @@
   }
 
   /* The page never moves; it is at its final position from the first frame. */
-  .running .riser {
+  .active .riser,
+  .started .riser {
     animation: none !important;
     will-change: auto;
+    transform: none;
   }
 
-  .curtain {
+  .started .curtain {
     z-index: 2;
     animation: curtainOut var(--reduced-fade) cubic-bezier(0.33, 1, 0.68, 1)
       var(--reduced-hold) both !important;

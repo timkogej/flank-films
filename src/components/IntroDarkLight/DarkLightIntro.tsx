@@ -49,6 +49,8 @@ function scoreVars(prefix: string, p: IntroProfile) {
   return {
     [`--${prefix}-shine-delay`]: `${m.shineStart}ms`,
     [`--${prefix}-shine-duration`]: `${p.shineDuration}ms`,
+    [`--${prefix}-settle-delay`]: `${m.surfaceSettleStart}ms`,
+    [`--${prefix}-settle-duration`]: `${p.surfaceSettleDuration}ms`,
     [`--${prefix}-rise-delay`]: `${m.riseStart}ms`,
     [`--${prefix}-rise-duration`]: `${p.riseDuration}ms`,
   };
@@ -66,13 +68,13 @@ const onClient = () => false;
 const onServerOrHydrating = () => true;
 
 /**
- * The DARK LIGHT intro.
+ * The FLANK light-surface intro.
  *
  * Structure — the same three-part shape the production intro proved, because
  * that part of it was never the problem:
  *
  *   .stage    one viewport, clipping, while the sequence runs
- *     .curtain  fixed graphite field holding the wordmark
+ *     .curtain  fixed light field holding the wordmark
  *     .riser    the REAL homepage, parked one viewport down and animated
  *               back to 0, occluding the curtain as it arrives
  *
@@ -87,10 +89,9 @@ const onServerOrHydrating = () => true;
  * the only thing that travels is the reflection. See the stylesheet for the
  * four layers that make it a surface rather than a silhouette.
  *
- * There is one configuration and the stylesheet contains only it — material
- * A, shine B, the polish luminance profile, the flat BG 1 ground. Nothing
- * here selects between variants, so production cannot drift onto the wrong
- * one and does not depend on the default state of a dev control.
+ * There is one production configuration: diffused studio light, a restrained
+ * satin reflection and a white-page settle. Nothing selects between variants,
+ * so production cannot drift onto a development treatment.
  *
  * The sequence is entirely declarative CSS, server-rendered in its opening
  * state, so the first paint the browser makes is already the finished frame.
@@ -124,8 +125,12 @@ export function DarkLightIntro({
     () => DARK_LIGHT_MODE === "every-load" && hydrating,
   );
   const [running, setRunning] = useState(entrance);
+  /* The opening frame is server-rendered and deliberately inert. The score is
+   * armed only after hydration, visibility and two paint boundaries agree, so
+   * CSS time can never elapse before the visitor has seen the intro. */
+  const [started, setStarted] = useState(false);
   /** Bumped by Replay. Restarts the CSS animations by remounting the curtain
-   *  and re-applying `.running` — never by remounting `children`, which would
+   *  and re-applying `.started` — never by remounting `children`, which would
    *  throw away the homepage's media and defeat the point of the prototype. */
   const [run, setRun] = useState(0);
 
@@ -176,6 +181,66 @@ export function DarkLightIntro({
 
   /* ------------------------------------------------------------- lifecycle */
 
+  useEffect(() => {
+    if (!running || started) return;
+
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    const cancelFrames = () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+
+    const armAfterPaint = () => {
+      cancelFrames();
+      if (document.visibilityState !== "visible") return;
+      firstFrame = requestAnimationFrame(() => {
+        secondFrame = requestAnimationFrame(() => {
+          if (document.visibilityState === "visible") setStarted(true);
+        });
+      });
+    };
+
+    armAfterPaint();
+    document.addEventListener("visibilitychange", armAfterPaint);
+    return () => {
+      cancelFrames();
+      document.removeEventListener("visibilitychange", armAfterPaint);
+    };
+  }, [running, started, run]);
+
+  /* A hidden tab does not spend the visitor's score. A BFCache navigation is
+   * different: the document is already an established visit, so complete the
+   * intro before it is snapshotted and never restore a partial curtain. */
+  useEffect(() => {
+    if (!running) return;
+    const animations = () =>
+      stage.current?.getAnimations({ subtree: true }) ?? [];
+    const syncVisibility = () => {
+      for (const animation of animations()) {
+        if (document.visibilityState === "hidden") animation.pause();
+        else if (animation.playState === "paused") animation.play();
+      }
+    };
+    const finishForHistory = (event: PageTransitionEvent) => {
+      if (event.persisted) setRunning(false);
+    };
+    const discardRestoredIntro = (event: PageTransitionEvent) => {
+      if (event.persisted) setRunning(false);
+    };
+
+    document.addEventListener("visibilitychange", syncVisibility);
+    window.addEventListener("pagehide", finishForHistory);
+    window.addEventListener("pageshow", discardRestoredIntro);
+    syncVisibility();
+    return () => {
+      document.removeEventListener("visibilitychange", syncVisibility);
+      window.removeEventListener("pagehide", finishForHistory);
+      window.removeEventListener("pageshow", discardRestoredIntro);
+    };
+  }, [running, started]);
+
   /**
    * End the sequence when the page has actually arrived, not when a stopwatch
    * says it should have.
@@ -187,7 +252,7 @@ export function DarkLightIntro({
    * that reports no animations at all.
    */
   useEffect(() => {
-    if (!running) return;
+    if (!running || !started) return;
 
     const reduced =
       typeof window.matchMedia === "function" &&
@@ -220,7 +285,7 @@ export function DarkLightIntro({
     return () => {
       live = false;
     };
-  }, [running, run]);
+  }, [running, started, run]);
 
   /**
    * Development guard for the official geometry.
@@ -258,7 +323,7 @@ export function DarkLightIntro({
   // parallel clock, for the same reason as above: there is only ever one
   // timeline. Never runs in a production build.
   useEffect(() => {
-    if (!DEV || !controls || !running) return;
+    if (!DEV || !controls || !running || !started) return;
     const el = stage.current;
     if (!el) return;
     for (const a of el.getAnimations({ subtree: true })) {
@@ -266,12 +331,13 @@ export function DarkLightIntro({
       if (paused) a.pause();
       else if (a.playState === "paused") a.play();
     }
-  }, [rate, paused, running, run, controls]);
+  }, [rate, paused, running, started, run, controls]);
 
   const replay = useCallback(() => {
     setPaused(false);
+    setStarted(false);
     setRunning(false);
-    // One frame down, so `.running` and the curtain are genuinely gone before
+    // One frame down, so `.active` and the curtain are genuinely gone before
     // they come back — otherwise the animations are never re-created and
     // nothing replays.
     requestAnimationFrame(() => {
@@ -285,15 +351,24 @@ export function DarkLightIntro({
   return (
     <div
       ref={stage}
-      className={running ? `${styles.stage} ${styles.running}` : styles.stage}
+      className={
+        running
+          ? `${styles.stage} ${styles.active}${started ? ` ${styles.started}` : ""}`
+          : styles.stage
+      }
       style={SCORE_STYLE}
     >
       {running && (
         <div key={run} className={styles.curtain} aria-hidden="true">
+          <div className={styles.lightField}>
+            <div className={`${styles.lightMass} ${styles.lightMassA}`} />
+            <div className={`${styles.lightMass} ${styles.lightMassB}`} />
+            <div className={`${styles.lightMass} ${styles.lightMassC}`} />
+          </div>
           <div className={styles.stack}>
             {/* Layers 1, 2 and 4, all cut by one mask from the official asset.
-                Nothing lit exists outside it, which is why no glow is
-                possible and the graphite field stays untouched. */}
+                Nothing lit exists outside it, so the reflection never becomes
+                a glow on the ambient field. */}
             <div className={styles.mark}>
               <div className={styles.base} />
               <div className={styles.face} />

@@ -12,6 +12,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { ArrowUpRight } from "@/components/ArrowUpRight/ArrowUpRight";
+import { lastInputWasKeyboard, moveFocus } from "@/lib/inputModality";
 import { pages, socialLinks, SITE_ROOT_ID, type PageKey } from "@/lib/site";
 
 import styles from "./MobileNav.module.css";
@@ -20,14 +22,17 @@ import styles from "./MobileNav.module.css";
  * Every duration in the phone navigation, in one table.
  *
  * Handed to the stylesheet as custom properties on the panel (the scrim and
- * tile transitions) and read directly by the label and content swaps below,
- * which run through the Web Animations API — so no number is written twice.
+ * tile transitions) and read directly by the content swap below, which runs
+ * through the Web Animations API — so no number is written twice.
  *
  *   open    scrim fades in; the two tiles lift into place 50ms apart (350ms)
  *   switch  the current words leave, the new words arrive in the SAME tiles,
  *           staggered like the reveal (~365ms); tiles and scrim do not move
  *   close   tiles and scrim go together, no stagger (260ms), then hide
- *   labels  MENU + ↔ CLOSE – / SOCIAL + ↔ CLOSE – (220ms), on every change
+ *
+ * The bar's own marks are deliberately NOT in this table: MENU + becomes
+ * CLOSE – in the same frame as the press, with no motion of its own, so the
+ * control answers instantly while the panel below does the moving.
  */
 const NAV_MOTION = {
   scrim: 300,
@@ -35,7 +40,6 @@ const NAV_MOTION = {
   tileStagger: 50,
   tileOut: 200,
   close: 260,
-  labelSwap: 220,
   textOut: 150,
   textIn: 230,
   textInDelay: 90,
@@ -163,6 +167,13 @@ export function MobileNav({ current }: { current: PageKey }) {
    *  (not unmounted) otherwise; see the note above. */
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
+  /**
+   * The navigation has been asked to be open. Set in the same handler as the
+   * press — unlike `open`, which trails by two frames so the panel's
+   * transitions have a closed state to start from. The bar's marks and ARIA
+   * follow this, so MENU + reads CLOSE – in the frame the press is handled.
+   */
+  const [expanded, setExpanded] = useState(false);
   /** Which content the shell is showing. Survives closing, so the words do
    *  not change under a panel that is fading away. */
   const [mode, setMode] = useState<Mode>("menu");
@@ -189,8 +200,8 @@ export function MobileNav({ current }: { current: PageKey }) {
    */
   const returningRef = useRef(true);
 
-  const leftClose = open && mode === "menu";
-  const rightClose = open && mode === "social";
+  const leftClose = expanded && mode === "menu";
+  const rightClose = expanded && mode === "social";
 
   const openPanel = useCallback((next: Mode) => {
     window.clearTimeout(closeTimer.current);
@@ -200,6 +211,7 @@ export function MobileNav({ current }: { current: PageKey }) {
       next === "social" ? socialButtonRef.current : menuButtonRef.current;
     setScrolled(window.scrollY > 0);
     setMode(next);
+    setExpanded(true);
     setVisible(true);
     // Two frames: the shell is revealed in its closed state and only then told
     // to open, so the transitions have something to move from. One frame is
@@ -209,6 +221,7 @@ export function MobileNav({ current }: { current: PageKey }) {
 
   const close = useCallback(() => {
     returningRef.current = true;
+    setExpanded(false);
     setOpen(false);
     window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(
@@ -231,6 +244,7 @@ export function MobileNav({ current }: { current: PageKey }) {
     returningRef.current = false;
     window.clearTimeout(closeTimer.current);
     closeTimer.current = 0;
+    setExpanded(false);
     setOpen(false);
     setVisible(false);
   }, []);
@@ -238,19 +252,27 @@ export function MobileNav({ current }: { current: PageKey }) {
   /** A bar mark inside the shell: close its own mode, or switch to it. */
   const pressBar = useCallback(
     (target: Mode) => {
-      if (!open) openPanel(target);
+      if (!expanded) openPanel(target);
       else if (mode === target) close();
       else {
         setMode(target);
-        // The pressed mark becomes this mode's CLOSE – and keeps focus. Stated
-        // rather than assumed: Safari does not focus a button on tap, and
-        // focus would otherwise fall out of the dialog onto <body>.
-        (target === "social" ? rightRef : leftRef).current?.focus({
-          preventScroll: true,
-        });
+        // Keep focus inside the dialog. A key press already left it on the
+        // mark, which is where a keyboard user expects it. A click or tap may
+        // not have focused anything — Safari never focuses a tapped button —
+        // so focus goes to the dialog itself rather than being pushed onto
+        // the mark by script, which WebKit can mistake for keyboard focus and
+        // ring.
+        const panel = panelRef.current;
+        if (panel && !panel.contains(document.activeElement)) {
+          moveFocus(
+            lastInputWasKeyboard()
+              ? ((target === "social" ? rightRef : leftRef).current ?? panel)
+              : panel,
+          );
+        }
       }
     },
-    [open, mode, openPanel, close],
+    [expanded, mode, openPanel, close],
   );
 
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
@@ -262,7 +284,8 @@ export function MobileNav({ current }: { current: PageKey }) {
     const phone = window.matchMedia(PHONE_QUERY);
     const check = () => {
       if (!phone.matches) {
-        setOpen(false);
+        setExpanded(false);
+    setOpen(false);
         setVisible(false);
       }
     };
@@ -304,56 +327,44 @@ export function MobileNav({ current }: { current: PageKey }) {
 
       window.scrollTo(0, scrollY);
 
-      // After the page behind is reachable again, never before.
+      // After the page behind is reachable again, never before. Visible only
+      // to a keyboard user, so a tap that closes the menu does not leave a
+      // ring on MENU + in engines that honour the hint.
       const origin = originRef.current;
-      if (origin && document.contains(origin)) {
-        origin.focus({ preventScroll: true });
-      }
+      if (origin && document.contains(origin)) moveFocus(origin);
     };
   }, [visible]);
 
-  // Focus enters on the mark that now reads CLOSE – — the control under the
-  // finger or key that opened it. Switching modes does not move focus: the
-  // mark that was pressed keeps it, and it is still inside the shell.
+  // Focus enters the dialog on opening.
+  //
+  // Opened from the keyboard, it lands on the mark that now reads CLOSE – —
+  // the useful first stop, with its keyboard ring. Opened by click or tap, it
+  // lands on the dialog itself: still inside, still announced, but not on a
+  // control. Script focus on a button after a pointer press is exactly what
+  // WebKit intermittently treats as keyboard focus, which drew a square around
+  // CLOSE –. Tab from the dialog reaches the marks and tiles as usual.
   useEffect(() => {
     if (!open) return;
-    const target = mode === "social" ? rightRef.current : leftRef.current;
-    target?.focus({ preventScroll: true });
+    const mark = mode === "social" ? rightRef.current : leftRef.current;
+    const target = lastInputWasKeyboard() ? mark : panelRef.current;
+    if (target) moveFocus(target);
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // ------------------------------------------------------------------ swaps
+  // ------------------------------------------------------------------- swap
   //
-  // Layout effects, so the animation's first frame is in place before the
-  // browser paints the new resting state.
+  // The MENU ↔ SOCIAL content hand-over. A layout effect, so the animation's
+  // first frame is in place before the browser paints the new resting state.
+  // The bar's labels are not animated here or anywhere: they change with the
+  // render that changes the state.
 
-  const previous = useRef({ leftClose, rightClose, mode, visible });
+  const previous = useRef({ mode, visible });
   useLayoutEffect(() => {
     const was = previous.current;
-    previous.current = { leftClose, rightClose, mode, visible };
+    previous.current = { mode, visible };
     // A fresh mount starts at rest; there is nothing to hand over from.
     if (!visible || !was.visible) return;
-
-    const labels = (button: HTMLButtonElement | null) => {
-      const spans = Array.from(
-        button?.querySelectorAll<HTMLElement>("[data-label]") ?? [],
-      );
-      return {
-        on: spans.filter((s) => s.dataset.active === "true"),
-        off: spans.filter((s) => s.dataset.active !== "true"),
-      };
-    };
-    const label = { out: NAV_MOTION.labelSwap, in: NAV_MOTION.labelSwap };
-
-    if (was.leftClose !== leftClose) {
-      const { on, off } = labels(leftRef.current);
-      swap(off, on, label);
-    }
-    if (was.rightClose !== rightClose) {
-      const { on, off } = labels(rightRef.current);
-      swap(off, on, label);
-    }
 
     if (was.mode !== mode) {
       const root = panelRef.current;
@@ -370,7 +381,7 @@ export function MobileNav({ current }: { current: PageKey }) {
         stagger: NAV_MOTION.textStagger,
       });
     }
-  }, [leftClose, rightClose, mode, visible]);
+  }, [mode, visible]);
 
   // Escape closes the whole navigation. Tab stays inside — `inert` already
   // excludes the page and the hidden mode, so this only wraps at the ends.
@@ -392,7 +403,13 @@ export function MobileNav({ current }: { current: PageKey }) {
       const first = items[0];
       const last = items[items.length - 1];
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || !root.contains(active))) {
+      // The dialog itself (where a pointer-opened menu puts focus) counts as
+      // "before the first control", so Shift+Tab from it wraps to the end
+      // instead of leaving the dialog.
+      if (
+        event.shiftKey &&
+        (active === first || active === root || !root.contains(active))
+      ) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && active === last) {
@@ -415,9 +432,10 @@ export function MobileNav({ current }: { current: PageKey }) {
   );
 
   /**
-   * A bar mark with both of its states stacked in one grid cell. The cell is
-   * as wide as the wider state, so SOCIAL + becoming CLOSE – never changes the
-   * button's box and nothing on the bar can shift.
+   * A bar mark with both of its states laid into one grid cell. Only one is
+   * ever visible, and it changes instantly — the other is there solely so the
+   * cell is as wide as the wider state, which is what keeps SOCIAL + becoming
+   * CLOSE – from changing the button's box or shifting anything on the bar.
    */
   const barMark = (
     ref: React.RefObject<HTMLButtonElement | null>,
@@ -432,15 +450,15 @@ export function MobileNav({ current }: { current: PageKey }) {
       className={styles.mark}
       data-side={side}
       onClick={() => pressBar(target)}
-      aria-expanded={open && mode === target}
+      aria-expanded={expanded && mode === target}
       aria-controls={GROUP_ID[target]}
       aria-label={closing ? `Close ${word.toLowerCase()}` : word}
     >
       <span className={styles.labels} aria-hidden="true">
-        <span className={styles.label} data-label data-active={!closing}>
+        <span className={styles.label} data-active={!closing}>
           {markText(word, "+")}
         </span>
-        <span className={styles.label} data-label data-active={closing}>
+        <span className={styles.label} data-active={closing}>
           {markText("Close", "–")}
         </span>
       </span>
@@ -459,6 +477,8 @@ export function MobileNav({ current }: { current: PageKey }) {
       role="dialog"
       aria-modal="true"
       aria-label={mode === "social" ? "Social" : "Menu"}
+      /* A focus destination for a pointer-opened menu, never a Tab stop. */
+      tabIndex={-1}
       style={
         {
           "--nav-scrim": `${NAV_MOTION.scrim}ms`,
@@ -553,7 +573,7 @@ export function MobileNav({ current }: { current: PageKey }) {
                 <span className={styles.word} data-word>
                   {link.label}
                   <span className={styles.out} aria-hidden="true">
-                    ↗
+                    <ArrowUpRight />
                   </span>
                 </span>
               </a>
@@ -572,7 +592,7 @@ export function MobileNav({ current }: { current: PageKey }) {
         className={styles.mark}
         onClick={() => openPanel("menu")}
         aria-haspopup="dialog"
-        aria-expanded={visible && open && mode === "menu"}
+        aria-expanded={expanded && mode === "menu"}
         /* Only while the shell is in the document: an aria-controls pointing
            at an id that does not exist is worse than none. */
         aria-controls={visible ? GROUP_ID.menu : undefined}
@@ -586,7 +606,7 @@ export function MobileNav({ current }: { current: PageKey }) {
         className={styles.mark}
         onClick={() => openPanel("social")}
         aria-haspopup="dialog"
-        aria-expanded={visible && open && mode === "social"}
+        aria-expanded={expanded && mode === "social"}
         aria-controls={visible ? GROUP_ID.social : undefined}
       >
         {markText("Social", "+")}

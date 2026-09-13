@@ -72,7 +72,7 @@
    Three levels and nothing else. A small label; the email as the one large,
    obvious action, set as an editorial row with a hairline under it; phone and
    location as a quiet line at the About copy's own size. No button, no pill,
-   no icon — the arrow is a glyph.
+   no icon library — the arrow is a small shared SVG (ArrowUpRight).
    -------------------------------------------------------------------------- */
 .contact {
   display: grid;
@@ -125,7 +125,8 @@
 }
 
 /* Light, and a little smaller than the address: it confirms the row is a
-   link without competing with what the link says. */
+   link without competing with what the link says. The font size here sets
+   the size of the SVG arrow inside, which is drawn in em. */
 .contactArrow {
   font-size: 0.8em;
   font-weight: 400;

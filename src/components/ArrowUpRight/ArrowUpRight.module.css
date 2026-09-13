@@ -1,0 +1,10 @@
+/* Sized in em so it follows the type beside it. Inline, so a flex row that
+   aligns on baseline sits its bottom edge on the text's baseline; the small
+   drop puts the ink where the old glyph's ink was. */
+.arrow {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  overflow: visible;
+  transform: translateY(0.09em);
+}

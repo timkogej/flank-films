@@ -35,6 +35,10 @@
 }
 
 .mark {
+  /* No native button rendering, on this control only: nothing of the UA's
+     button box may ever show around MENU + / CLOSE –. */
+  -webkit-appearance: none;
+  appearance: none;
   font-size: var(--nav-size-phone);
   font-weight: 500;
   letter-spacing: var(--nav-tracking-phone);
@@ -84,8 +88,8 @@
   grid-area: 1 / 1;
 }
 
-/* Resting state only. The hand-over between the two is animated by the
-   component, so the direction of travel can be right both ways. */
+/* The inactive state is present only to hold the cell's width. It is hidden
+   outright and switches with the state — no transition, no movement. */
 .label[data-active="false"] {
   opacity: 0;
 }
@@ -113,6 +117,13 @@
     max(var(--page-gap), env(safe-area-inset-left, 0px));
   /* Presses fall through to the scrim everywhere the shell is not. */
   pointer-events: none;
+}
+
+/* The dialog receives focus when opened by click or tap; it is a focus
+   destination, never a Tab stop, so there is nothing for a ring to say. The
+   controls inside keep the site's keyboard ring. */
+.panel:focus {
+  outline: none;
 }
 
 /* At rest the shell is present but not shown. `visibility` rather than an
@@ -307,7 +318,8 @@
   align-self: center;
 }
 
-/* Leaves the site. Typographic, and small beside the word it qualifies. */
+/* Leaves the site. The shared ArrowUpRight, sized by this font size, and
+   small beside the word it qualifies. */
 .out {
   font-size: 13px;
   font-weight: 400;

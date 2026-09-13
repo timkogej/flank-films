@@ -6,11 +6,39 @@ import { site, SITE_ROOT_ID } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
   title: {
     default: site.legalName,
     template: `%s — ${site.legalName}`,
   },
   description: site.description,
+  openGraph: {
+    type: "website",
+    siteName: site.legalName,
+    title: site.legalName,
+    description: site.description,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "FLANK FILMS wordmark",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: site.legalName,
+    description: site.description,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "FLANK FILMS wordmark",
+      },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

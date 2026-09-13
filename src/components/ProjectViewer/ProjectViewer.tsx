@@ -18,6 +18,7 @@ import {
 } from "@/data/projects";
 import { setViewerActive } from "@/components/ProjectCard/previewScheduler";
 import { ProjectMetaText } from "@/components/ProjectMeta/ProjectMetaText";
+import { lastInputWasKeyboard, moveFocus } from "@/lib/inputModality";
 import { SITE_ROOT_ID } from "@/lib/site";
 
 import {
@@ -258,17 +259,21 @@ export function ProjectViewer({
 
     // 4. Focus goes in, and comes back to the frame it came from.
     //
-    // Where it goes depends on how the viewer was opened. A pointer or
-    // keyboard user gets the Close button — the useful first stop. A touch
-    // user gets the dialog itself: focus still enters, screen readers still
-    // announce it, but no control is left wearing a focus ring that the
-    // person who tapped never asked for and cannot dismiss.
+    // Where it goes depends on how the viewer was opened. A keyboard user
+    // gets the Close button — the useful first stop, with its keyboard ring.
+    // A pointer or touch user gets the dialog itself: focus still enters,
+    // screen readers still announce it, and Tab still reaches Close first.
+    //
+    // It used to be Close for a mouse too, and that was the square around the
+    // X. Script focus on a button after a click is a guess for `:focus-visible`
+    // — WebKit, which does not focus a clicked link, sometimes guessed
+    // "keyboard", and the site's keyboard ring appeared on the first open and
+    // then vanished after a click. Focusing the dialog leaves nothing to guess.
     const origin = document.activeElement as HTMLElement | null;
-    const coarse =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(hover: none)").matches;
-    const entry = coarse ? rootRef.current : closeButtonRef.current;
-    entry?.focus({ preventScroll: true });
+    const entry = lastInputWasKeyboard()
+      ? closeButtonRef.current
+      : rootRef.current;
+    if (entry) moveFocus(entry);
 
     return () => {
       setViewerActive(false);
@@ -278,10 +283,9 @@ export function ProjectViewer({
       else body.setAttribute("style", previousStyle);
       window.scrollTo(0, scrollY);
 
-      // After the background is reachable again, never before.
-      if (origin && document.contains(origin)) {
-        origin.focus({ preventScroll: true });
-      }
+      // After the background is reachable again, never before. Visible only
+      // to a keyboard user, in engines that honour the hint.
+      if (origin && document.contains(origin)) moveFocus(origin);
     };
   }, [isModal]);
 
@@ -364,7 +368,12 @@ export function ProjectViewer({
     const first = items[0];
     const last = items[items.length - 1];
     const active = document.activeElement;
-    if (event.shiftKey && (active === first || !root.contains(active))) {
+    // The dialog itself — where a pointer-opened viewer puts focus — counts
+    // as "before the first control", so Shift+Tab from it wraps to the end.
+    if (
+      event.shiftKey &&
+      (active === first || active === root || !root.contains(active))
+    ) {
       event.preventDefault();
       last.focus();
     } else if (!event.shiftKey && active === last) {
@@ -470,16 +479,18 @@ export function ProjectViewer({
       data-idle={!controlsVisible && playing ? "true" : "false"}
       onPointerMove={bumpActivity}
       onKeyDown={onRootKeyDown}
-      // Keyboard focus in the chrome holds it open. Only keyboard focus:
-      // opening the viewer with the mouse puts focus on Close deliberately,
-      // and if that counted the controls would never fade for a mouse user at
-      // all. `:focus-visible` is the browser's own answer to which kind of
-      // focus this is, so it is not re-derived here.
+      // Keyboard focus in the chrome holds it open. Only keyboard focus on a
+      // control: opening the viewer by pointer puts focus on the dialog
+      // itself, and if that counted the controls would never fade for a mouse
+      // user at all — so the dialog is excluded outright rather than trusted
+      // to fail `:focus-visible`, which script focus can wrongly pass.
+      // `:focus-visible` remains the browser's own answer for the controls.
       // Tracked at the root so moving between the top bar and the control bar
       // is not read as leaving, which per-bar handlers would get wrong.
       onFocus={(event) =>
         setControlsFocused(
-          event.target instanceof Element &&
+          event.target !== event.currentTarget &&
+            event.target instanceof Element &&
             event.target.matches(":focus-visible"),
         )
       }
