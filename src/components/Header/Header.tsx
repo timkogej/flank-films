@@ -1,44 +1,51 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { social } from "@/lib/site";
+import { MobileNav } from "./MobileNav";
+import { pages, socialLinks, type PageKey } from "@/lib/site";
 
 import styles from "./Header.module.css";
 
 /**
  * Compact editorial header.
  *
- * The wordmark is positioned absolutely against the header box and offset by
- * -50% of its own width, so it sits on the true geometric centre of the
- * viewport no matter how wide the left or right navigation groups become.
+ * Two headers share one element and one wordmark. Above 700px the four links
+ * are on the bar — HOME, ABOUT & CONTACT, then the two accounts — exactly as
+ * they have always been. Below it those groups are hidden and `MobileNav`'s
+ * two marks take the bar instead, because four links at phone width is the
+ * compression the redesign exists to remove.
+ *
+ * The wordmark belongs to neither group. It is positioned absolutely against
+ * the header box and offset by -50% of its own width, so it sits on the true
+ * geometric centre of the viewport however wide the side groups become — or
+ * whether they are there at all. Nothing in the phone bar or the phone panel
+ * touches it.
  *
  * `current` marks the active route — carried by tone and weight only, with
  * `aria-current` doing the semantic work. Passed as a prop rather than read
- * from `usePathname()` so the header stays a server component with no client
- * JS.
+ * from `usePathname()` so this stays a server component; only the phone menu,
+ * which needs state, is a client island.
  */
-export function Header({ current = "home" }: { current?: "home" | "about" }) {
-  const navLink = (page: "home" | "about") =>
+export function Header({ current = "home" }: { current?: PageKey }) {
+  const navLink = (page: PageKey) =>
     `${styles.link} ${page === current ? styles.linkCurrent : styles.linkInactive}`;
 
   return (
     <header className={styles.header}>
       <nav className={styles.left} aria-label="Primary">
-        <Link
-          href="/"
-          className={navLink("home")}
-          aria-current={current === "home" ? "page" : undefined}
-        >
-          Home
-        </Link>
-        <Link
-          href="/about"
-          className={navLink("about")}
-          aria-current={current === "about" ? "page" : undefined}
-        >
-          About &amp; Contact
-        </Link>
+        {pages.map((page) => (
+          <Link
+            key={page.key}
+            href={page.href}
+            className={navLink(page.key)}
+            aria-current={page.key === current ? "page" : undefined}
+          >
+            {page.label}
+          </Link>
+        ))}
       </nav>
+
+      <MobileNav current={current} />
 
       <Link href="/" className={styles.logo} aria-label="FLANK — home">
         <Image
@@ -52,30 +59,17 @@ export function Header({ current = "home" }: { current?: "home" | "about" }) {
       </Link>
 
       <nav className={styles.social} aria-label="Social">
-        <a
-          className={styles.link}
-          href={social.instagram}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label="FLANK on Instagram"
-        >
-          <span className={styles.labelFull}>Instagram</span>
-          <span className={styles.labelShort} aria-hidden="true">
-            IG
-          </span>
-        </a>
-        <a
-          className={styles.link}
-          href={social.linkedin}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label="FLANK on LinkedIn"
-        >
-          <span className={styles.labelFull}>LinkedIn</span>
-          <span className={styles.labelShort} aria-hidden="true">
-            LI
-          </span>
-        </a>
+        {socialLinks.map((link) => (
+          <a
+            key={link.key}
+            className={styles.link}
+            href={link.href}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            {link.label}
+          </a>
+        ))}
       </nav>
     </header>
   );

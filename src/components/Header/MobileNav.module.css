@@ -1,0 +1,321 @@
+/* ==========================================================================
+   Phone navigation.
+
+   Two parts: the bar that lives in the header (MENU + / SOCIAL +) and the
+   shell those two open. Both are scoped to phones from inside this file — the
+   bar is `display: none` until 699px and the shell is `display: none` from
+   700px — so no rule here can reach the wide header.
+
+   The shell is the header's own white bar, two white editorial tiles under it
+   in the mosaic's gutter rhythm, and the page behind softened and dimmed. The
+   tiles are crisp white on purpose: the blur is only what separates the
+   navigation from the page, never a frosted surface of its own.
+
+   Durations come from NAV_MOTION in MobileNav.tsx, set on the panel as
+   `--nav-*` properties. Nothing below writes a millisecond value.
+   ========================================================================== */
+
+/* The two marks in the closed header. `.bar` spans the header so one sits at
+   each end; the wordmark is absolutely centred over the middle and belongs to
+   the header, not to this bar, so nothing here can move it. */
+.bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The one switch. Above this width the wide header owns the bar and nothing in
+   this file renders; below it, the two marks replace the four links. */
+@media (max-width: 699px) {
+  .bar {
+    display: flex;
+  }
+}
+
+.mark {
+  font-size: var(--nav-size-phone);
+  font-weight: 500;
+  letter-spacing: var(--nav-tracking-phone);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  /* The bar is 56px and centres its row, so this grows the hit area to the
+     full height without moving a glyph. */
+  padding-block: 16px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The sign carries the state: + opens, – closes. Held apart from the word by
+   a margin in em, so the two read as one mark. */
+.sign {
+  display: inline-block;
+  /* Both signs occupy the same box, so + and – never shift the word. */
+  width: 0.75em;
+  text-align: center;
+  margin-left: 0.42em;
+}
+
+/* Both states of a shell mark, stacked in one cell. The cell is as wide as
+   the wider state, so the button's box is identical before, during and after
+   a swap. The left mark ranges its words left and the right mark ranges them
+   right — onto exactly the glyph positions the closed header's marks have. */
+.labels {
+  display: grid;
+}
+
+.mark[data-side="left"] .labels {
+  justify-items: start;
+}
+
+.mark[data-side="right"] .labels {
+  justify-items: end;
+}
+
+.label {
+  grid-area: 1 / 1;
+}
+
+/* Resting state only. The hand-over between the two is animated by the
+   component, so the direction of travel can be right both ways. */
+.label[data-active="false"] {
+  opacity: 0;
+}
+
+/* --------------------------------------------------------------------------
+   The shell.
+
+   Fixed to the viewport and rendered through a portal into <body>, for the
+   same reason the project viewer is a sibling of the page rather than a child:
+   the page sits inside the intro's riser, which animates a transform, and a
+   transformed ancestor would capture `position: fixed`.
+   -------------------------------------------------------------------------- */
+.panel {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  /* dvh, not vh: Safari's shrinking address bar must not change the height
+     this is measured against mid-gesture. */
+  height: 100dvh;
+  /* The page's own inset expression, so the bar lands on the header's line
+     and in its column to the pixel. */
+  padding: max(var(--page-gap), env(safe-area-inset-top, 0px))
+    max(var(--page-gap), env(safe-area-inset-right, 0px))
+    max(var(--page-gap), env(safe-area-inset-bottom, 0px))
+    max(var(--page-gap), env(safe-area-inset-left, 0px));
+  /* Presses fall through to the scrim everywhere the shell is not. */
+  pointer-events: none;
+}
+
+/* Belt and braces with the resize listener in the component: a viewport that
+   grows past the breakpoint while the menu is open cannot leave a scrim over
+   the wide layout. */
+@media (min-width: 700px) {
+  .panel {
+    display: none;
+  }
+}
+
+/* The page behind: softened and dimmed, and nothing more.
+
+   The blur is fixed and only the layer's opacity moves — animating the radius
+   would re-rasterise the page every frame. Opacity is on THIS element and not
+   on an ancestor, because an ancestor below full opacity becomes the backdrop
+   root and the blur would see nothing until the fade had finished. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: rgb(0 0 0 / 0.3);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transition: opacity var(--nav-close) var(--nav-ease);
+}
+
+/* No backdrop-filter: the dim alone has to do the separating, so it is
+   stronger. Matches what the scrim was before the blur existed. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .scrim {
+    background: rgb(0 0 0 / 0.5);
+  }
+}
+
+.panel[data-state="open"] .scrim {
+  opacity: 1;
+  transition-duration: var(--nav-scrim);
+}
+
+/* Bar + tiles, top-aligned and exactly as tall as they are. */
+.shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--header-gap);
+  pointer-events: auto;
+}
+
+/* The shell's bar. Same height, insets, radius and wordmark as the real
+   header, and opaque from the first frame: at the top of the page it sits
+   exactly over the header, so it is never seen to arrive and the wordmark
+   cannot move by a pixel. */
+.panelBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  height: var(--header-height);
+  padding: 0 var(--header-inset);
+  border-radius: var(--header-radius);
+  background: var(--background);
+  flex: none;
+}
+
+/* Scrolled, the real header is not underneath, so the bar fades with the
+   scrim instead of appearing. */
+.panel[data-scrolled] .panelBar {
+  opacity: 0;
+  transition: opacity var(--nav-close) var(--nav-ease);
+}
+
+.panel[data-scrolled][data-state="open"] .panelBar {
+  opacity: 1;
+  transition-duration: var(--nav-scrim);
+}
+
+.panelLogo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  width: var(--logo-width);
+}
+
+.panelLogo img {
+  width: 100%;
+  height: auto;
+}
+
+/* --------------------------------------------------------------------------
+   The tiles.
+
+   Two white blocks in the mosaic's 4px gutter. Both modes are laid into the
+   SAME two cells, so switching MENU ↔ SOCIAL changes the words inside the
+   tiles and never the tiles themselves: no height change, no edge moving, no
+   flash of the page between them.
+   -------------------------------------------------------------------------- */
+.tiles {
+  --tile-height: 104px;
+
+  display: grid;
+}
+
+.group {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-rows: repeat(2, var(--tile-height));
+  gap: var(--media-gap);
+}
+
+.group[data-active="false"] {
+  pointer-events: none;
+}
+
+/* Large editorial type set low in a plain white field — a spread's running
+   head, not a button. */
+.tile {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--header-inset) 16px;
+  border-radius: var(--card-radius);
+  background: var(--background);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+
+  /* The reveal: each tile lifts a few pixels into place, the second a beat
+     after the first. Closing takes both away together. */
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity var(--nav-tile-out) var(--nav-ease),
+    transform var(--nav-tile-out) var(--nav-ease);
+}
+
+.panel[data-state="open"] .tile {
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--nav-tile-in);
+  transition-delay: calc(var(--i, 0) * var(--nav-tile-stagger));
+}
+
+.word {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.group[data-active="false"] .word {
+  opacity: 0;
+}
+
+/* Only the active mode paints the white field. The two groups are stacked in
+   one cell, so an inactive group's opaque tiles would sit over the active
+   group's words whenever it happened to come later in the document. Both
+   groups' tiles share the same rectangle, so handing the fill over between
+   them is invisible — and a word that is still fading out of the inactive
+   group stays visible above it. */
+.group[data-active="false"] .tile {
+  background: transparent;
+}
+
+/* The current page, stated once and quietly: a small mark at the end of its
+   tile. No pill, no fill, no colour. */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--foreground);
+  flex: none;
+  align-self: center;
+}
+
+/* Leaves the site. Typographic, and small beside the word it qualifies. */
+.out {
+  font-size: 15px;
+  font-weight: 400;
+  opacity: 0.45;
+}
+
+/* Pointer devices only: a phone has no hover, and a sticky hover state left
+   behind after a tap is worse than none. */
+@media (hover: hover) and (pointer: fine) {
+  .mark:hover {
+    opacity: 0.45;
+  }
+
+  .tile:hover .word {
+    opacity: 0.5;
+  }
+}
+
+/* The narrowest phones give up a little tile height, never type size. */
+@media (max-width: 374px) {
+  .tiles {
+    --tile-height: 96px;
+  }
+}

@@ -15,8 +15,9 @@
 
    Nothing is embossed, nothing is blurred, nothing is extruded, and the
    silhouette is the official asset at every layer. Everything tunable is in
-   the block below; the custom properties mirror DARK_LIGHT_SCORE /
-   DARK_LIGHT_TIMING in darkLightConfig.ts one-for-one.
+   the block below — except pacing, which is not written in this file at all:
+   every duration and delay comes from INTRO_SCORE in darkLightConfig.ts, set
+   on the stage as `--desktop-*` / `--phone-*` properties by the component.
 
    These values are the approved configuration and they are the only ones the
    file contains: material A, shine B, the polish luminance profile and the
@@ -26,27 +27,38 @@
    ========================================================================== */
 
 .stage {
-  /* -- score (ms) ------------------------------------------------------- */
-  --shine-delay: 180ms;
-  --shine-duration: 900ms;
-  --rise-delay: 1300ms;
-  --rise-duration: 640ms;
+  /* -- score ------------------------------------------------------------
+     Values come from INTRO_SCORE (darkLightConfig.ts), inlined on this
+     element. This only selects the profile; the phone block re-points them. */
+  --shine-delay: var(--desktop-shine-delay);
+  --shine-duration: var(--desktop-shine-duration);
+  --rise-delay: var(--desktop-rise-delay);
+  --rise-duration: var(--desktop-rise-duration);
 
   /* -- easing ----------------------------------------------------------- */
   /* Linear, and measured rather than assumed: the field's start and end are
      solved so the F is touched on the first frame and the K clears on the
      last, so any ease spends the ends of the pass sitting still. A reflection
-     also has no mass — easing it reads as hesitation, not weight. */
+     also has no mass — easing it reads as hesitation, not weight. Re-checked
+     at the slower pacing against a near-constant-middle custom curve: it
+     trimmed only ~20ms of faint light off each end while making the visible
+     pass change speed by 7-10%, so linear stays. */
   --shine-ease: linear;
-  /* A heavy surface taking the frame, not a panel flung at it: ~33% by 130ms,
-     ~74% by 260ms, then a settle that is still visibly moving rather than
+  /* A heavy surface taking the frame, not a panel flung at it: ~33% of the
+     travel in the first fifth of the duration, ~74% by two fifths, then a settle that is still visibly moving rather than
      asymptotically crawling. No overshoot; it arrives exactly at 0. */
   --rise-ease: cubic-bezier(0.3, 0.25, 0.2, 1);
 
   /* -- ground -----------------------------------------------------------
      BG 1: a flat graphite field. Flat is the approved choice — the falloff
      variant trialled alongside it (BG 2) was not selected. */
-  --graphite: #101010;
+  /* Lifted from #101010, which left the black mark almost indistinguishable
+     from its ground before the light arrived. Tested at #1E1E1E / #202020 /
+     #222222 (and #1A1A1A) with the material unchanged: #1E1E1E doubles the
+     mark's separation from the ground at rest and is the value at which the
+     mid-shine face merges least with it, while still reading as deep
+     graphite rather than grey. */
+  --graphite: #1e1e1e;
 
   /* -- the object ------------------------------------------------------- */
   --mark-w: 56vw;
@@ -77,8 +89,8 @@
      `--shine-dark` / `--shine-settle` are positions along that field: where
      its leading falloff reaches zero, and where its trailing falloff returns
      to zero. Travelling between exactly those two points spends the whole
-     900ms on light that is actually on the letterforms, and — because BOTH
-     ends are zero — guarantees the mark is black before the pass and black
+     shine duration on light that is actually on the letterforms, and —
+     because BOTH ends are zero — guarantees the mark is black before the pass and black
      after it. */
   --shine-angle: 104deg;
   --shine-span: 3;
@@ -318,8 +330,9 @@
    Phone.
 
    Same object, not a scaled-down picture of it. The reflection field is
-   broadened relative to the mark and given slightly more time, because a
-   small screen is exactly where a specular highlight turns into a sparkle.
+   broadened relative to the mark, because a small screen is exactly where a
+   specular highlight turns into a sparkle. Pacing is the phone profile of
+   INTRO_SCORE.
    The edge stroke is thickened in user units to survive the smaller scale.
    -------------------------------------------------------------------------- */
 @media (max-width: 699px) {
@@ -327,14 +340,12 @@
     --mark-w: 82vw;
     --mark-lift: 1.4dvh;
     --shine-angle: 101deg;
-    --shine-duration: 940ms;
-    --rise-delay: 1340ms;
-    --rise-duration: 620ms;
+    --shine-delay: var(--phone-shine-delay);
+    --shine-duration: var(--phone-shine-duration);
+    --rise-delay: var(--phone-rise-delay);
+    --rise-duration: var(--phone-rise-duration);
   }
 
-  /* Thickened in user units so the depth cue survives the smaller scale, but
-     only just: pushed further it stops reading as a lit edge and starts
-     reading as an outline drawn around the letters. */
   /* The edge is thickened in user units so the depth cue survives the smaller
      scale, but only just: pushed further it stops reading as a lit edge and
      starts reading as an outline drawn around the letters. */
@@ -366,6 +377,7 @@
 
   .curtain {
     z-index: 2;
-    animation: curtainOut 200ms cubic-bezier(0.33, 1, 0.68, 1) 320ms both !important;
+    animation: curtainOut var(--reduced-fade) cubic-bezier(0.33, 1, 0.68, 1)
+      var(--reduced-hold) both !important;
   }
 }

@@ -5,9 +5,11 @@ import { useEffect, useRef } from "react";
 import type { Project } from "@/data/projects";
 
 import {
+  afterStills,
   isViewerActive,
   observePreview,
   refreshPreviews,
+  trackStill,
 } from "./previewScheduler";
 import styles from "./ProjectCard.module.css";
 
@@ -177,31 +179,25 @@ export function ProjectPreviewMedia({
     // was the actual failure: eight video files competing with eight posters
     // for the same pipe, and the posters — the layer that guarantees the card
     // is never empty — losing the race to the layer that is only an
-    // enhancement. Each card releases its own video only once its own still
-    // has landed, so the safety layer always wins and the rule needs no
-    // knowledge of how many cards there are.
+    // enhancement. No card releases its video until every still in the
+    // mosaic has landed (see afterStills), so the safety layer always wins —
+    // including the largest stills, which a per-card rule left starved by the
+    // videos the smaller ones had already released.
     //
-    // On a fast connection the still resolves in tens of milliseconds, so the
-    // Phase 4.1 prewarm is unaffected.
+    // On a fast connection the stills resolve in tens of milliseconds, so the
+    // intro prewarm is unaffected.
     // Assigning src IS the release. The element ships without one, so the
     // preload scanner cannot start pulling video the moment the document
     // parses, and setting it here starts exactly one fetch.
     const releaseVideo = () => {
-      if (video.src || !src) return;
+      if (disposed || video.src || !src) return;
       video.preload =
         previewMode === "autoplay" && finePointer.matches ? "auto" : "metadata";
       video.src = src;
     };
     const still = root.querySelector("img");
-    if (!still) releaseVideo();
-    else {
-      still.addEventListener("load", releaseVideo, { once: true });
-      still.addEventListener("error", releaseVideo, { once: true });
-      // The local poster can finish in the tiny interval between querying it
-      // and attaching the listeners. Re-check after subscribing so that fast
-      // cache/local hits cannot strand a preview without a source.
-      if (still.complete) releaseVideo();
-    }
+    const untrackStill = still ? trackStill(still) : () => {};
+    const cancelRelease = afterStills(releaseVideo);
 
     video.addEventListener("loadeddata", onLoadedData);
     document.addEventListener("visibilitychange", sync);
@@ -225,8 +221,8 @@ export function ProjectPreviewMedia({
       root.removeEventListener("pointerenter", onEnter);
       root.removeEventListener("pointerleave", onLeave);
       root.removeEventListener("pointercancel", onLeave);
-      still?.removeEventListener("load", releaseVideo);
-      still?.removeEventListener("error", releaseVideo);
+      cancelRelease();
+      untrackStill();
       video.pause();
     };
   }, [previewMode, order, src]);

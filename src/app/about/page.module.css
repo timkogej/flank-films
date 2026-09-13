@@ -24,16 +24,34 @@
   gap: var(--media-gap);
 }
 
-/* Mobile order: the visual first, the FLANK panel last as the closing moment.
-   The FLANK panel is first in the DOM because that is its desktop position. */
+/* Stacked order (tablet): the visual first, the FLANK panel last as the
+   closing moment. The FLANK panel is first in the DOM because that is its
+   desktop position. */
 .visuals > *:nth-child(1) {
   order: 2;
   aspect-ratio: 5 / 4;
 }
 
+/* The reel. 4:5 is the crop every film's mobile focal point was checked in
+   (see REEL_FRAMING in data/about), so the stacked frame keeps it. */
 .visuals > *:nth-child(2) {
   order: 1;
   aspect-ratio: 4 / 5;
+}
+
+/* Phones: the reel alone.
+
+   The FLANK panel is a cursor-driven light, and on a touch screen it is
+   neither — so it is not replaced with a touch gesture or an automatic sweep,
+   it is simply not in the phone layout. `display: none` rather than an
+   unmount keeps the page one server-rendered tree across the breakpoint; a
+   hidden panel is never intersected, so its one-shot sweep cannot fire, and
+   its lazy images are never requested. The reel is left as the one lower
+   media element, full width inside the page inset at the same 4:5. */
+@media (max-width: 699px) {
+  .visuals > *:nth-child(1) {
+    display: none;
+  }
 }
 
 @media (min-width: 900px) {

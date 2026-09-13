@@ -517,10 +517,17 @@ export const projects: Project[] = [
     // Reviewed against the whole loop in the 948 x 344 frame, not inherited
     // from the old card: at 40% the otpbanka mark fell off the top edge and
     // the actor lost the top of his head on four of seven sampled beats. 26%
-    // keeps the mark, the hedgehog and every head inside the frame. Mobile
-    // gives this card a true 16:9, so nothing is cropped there at all.
+    // keeps the mark, the hedgehog and every head inside the frame.
     desktopFocalPoint: "50% 26%",
-    mobileFocalPoint: "50% 26%",
+    // Phones put this card fourth, in the 21:9 frame, so it is cropped here
+    // now where it used to be a true 16:9 and was not cropped at all. Checked
+    // the same way, against seven beats of the loop in that frame: 26% clipped
+    // the top of the actor's head on three of them, 0% held every head but
+    // pinned the picture hard to its ceiling. 12% keeps every head and the
+    // otpbanka mark inside the frame with the composition still breathing.
+    // Only phones read this — see ProjectCard.module.css, where --focal-mobile
+    // is scoped to the same 699px breakpoint the reorder is.
+    mobileFocalPoint: "50% 12%",
   },
 ];
 

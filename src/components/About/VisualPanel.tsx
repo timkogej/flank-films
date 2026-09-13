@@ -15,7 +15,8 @@ const KEEP_RATIO = 0.15;
 const HAS_FRAME = 2;
 
 /**
- * The About reel: the three Pingo films, whole, one after another, forever.
+ * The About reel: four curated films, whole, one after another, forever.
+ * OTP, Schweppes, Pingo and Fresh 32 — see REEL_ORDER in data/about.
  *
  * Not a project card and deliberately not built from one: no controls, no
  * overlay, no title, no hover, no click target, and none of the homepage's

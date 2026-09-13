@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   height: var(--header-height);
-  padding: 0 14px;
+  padding: 0 var(--header-inset);
   border-radius: var(--header-radius);
   background: var(--background);
   flex: none;
@@ -41,12 +41,10 @@
   font-weight: 400;
 }
 
-/* Full social labels on desktop, two-letter marks in the tight mobile bar. */
-.labelShort {
-  display: none;
-}
-
-/* True viewport-centred wordmark, independent of the side group widths. */
+/* True viewport-centred wordmark, independent of the side group widths — and
+   of whether there are side groups at all. Its width is a token so the phone
+   panel's own bar can set the mark at the identical size on the identical
+   centre line; see MobileNav.module.css. */
 .logo {
   position: absolute;
   left: 50%;
@@ -54,7 +52,7 @@
   transform: translate(-50%, -50%);
   display: block;
   /* Recognisable, but still header furniture rather than a hero graphic. */
-  width: 118px;
+  width: var(--logo-width);
 }
 
 .logoMark {
@@ -79,77 +77,48 @@
 }
 
 @media (max-width: 1099px) {
-  .header {
-    padding: 0 12px;
-  }
-
   .left,
   .social {
     gap: 14px;
   }
-
-  .logo {
-    width: 108px;
-  }
 }
 
-@media (max-width: 699px) {
-  .header {
-    padding: 0 10px;
-  }
+/* Phones: the four links come off the bar entirely.
 
+   They are not shortened, re-tracked or shrunk to fit any more — all three
+   were tried, and all three were the complaint. MobileNav puts MENU + and
+   SOCIAL + here instead and holds every destination behind them, so the closed
+   bar carries two marks and the wordmark and nothing else.
+
+   Hidden rather than unmounted: the wide header stays one server-rendered
+   thing, and the breakpoint costs no layout work and no second tree. */
+@media (max-width: 699px) {
   .left,
   .social {
-    gap: 12px;
-  }
-
-  .labelFull {
     display: none;
-  }
-
-  .labelShort {
-    display: inline;
-  }
-
-  .logo {
-    width: 94px;
-  }
-}
-
-/* Below ~480px, "About & Contact" needs both a smaller header inset and a
-   near-zero nav gap to clear the centred wordmark at a still-legible
-   (9.5px+) size instead of shrinking type alone down to the point of being
-   hard to read. The inset reduction is scoped to the header only — it does
-   not touch --page-gap, so it does not move the page content grid below. */
-@media (max-width: 479px) {
-  .header {
-    padding: 0 3px;
-  }
-
-  .left {
-    gap: 2px;
   }
 }
 
 /* --------------------------------------------------------------------------
    Touch targets.
 
-   The nav marks are 12px of uppercase type — correct typography, and far too
+   The nav marks are 12.5px of uppercase type — correct typography, and far too
    small a thing to hit with a thumb. The header has a fixed height and centres
    its rows, so padding grows the hit area to the full bar without moving a
-   single glyph or changing the header by a pixel. Verified at 360-430px.
+   single glyph or changing the header by a pixel.
 
-   Pointer devices are left exactly as they were.
+   This is the wide header's own provision, and now reaches only the 700-1099px
+   band on a touch device: below 700px these links are not on the bar at all,
+   and MobileNav sizes its own marks.
    -------------------------------------------------------------------------- */
 @media (pointer: coarse) {
   .link {
     padding-block: 14px;
   }
 
-  /* IG and LI are two-letter marks about 12px wide. Negative margin cancels
-     the horizontal padding exactly, so the hit area grows by 16px and the
-     glyphs do not move: the gaps, the logo centre and the header are
-     unchanged, and only what can be pressed is different. */
+  /* Negative margin cancels the horizontal padding exactly, so the hit area
+     grows by 16px and the glyphs do not move: the gaps, the logo centre and
+     the header are unchanged, and only what can be pressed is different. */
   .social .link {
     padding-inline: 8px;
     margin-inline: -8px;

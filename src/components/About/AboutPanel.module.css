@@ -62,53 +62,113 @@
 }
 
 /* --------------------------------------------------------------------------
-   Contact: EMAIL and PHONE, side by side — a small footer to the statement,
-   not a strip across the page. No rules, no cells, no backgrounds; the gap
-   between the two is the only separator, and it is sized to the content
-   rather than stretched to fill anything.
+   Contact: the page's sign-off.
+
+     CONTACT
+     hello@flankfilms.com                    ↗
+     ───────────────────────────────────────────
+     +386 31 663 288  ·  Slovenia
+
+   Three levels and nothing else. A small label; the email as the one large,
+   obvious action, set as an editorial row with a hairline under it; phone and
+   location as a quiet line at the About copy's own size. No button, no pill,
+   no icon — the arrow is a glyph.
    -------------------------------------------------------------------------- */
 .contact {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
-  column-gap: clamp(32px, 9vw, 56px);
-  row-gap: 20px;
-  font-style: normal;
+  gap: 16px;
   align-content: start;
+  /* The row takes the width it is given, up to a measure: wide enough that
+     the arrow reads as the end of a line, not so wide on a big desktop that
+     it drifts away from the address it belongs to. */
+  justify-items: stretch;
+  max-width: 34rem;
 }
 
-.contactItem {
-  display: grid;
-  gap: 5px;
-  align-content: start;
-}
-
-.contactLabel {
+.contactHeading {
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.11em;
+  line-height: 1;
   text-transform: uppercase;
-  opacity: 0.5;
+  margin: 0;
 }
 
-/* The same size AND line height as the About copy: the strip reads as part
-   of the same page of type, with the labels alone stepping down — and on
-   desktop, identical line boxes are what put the contact's last baseline on
-   the copy's last baseline. */
-.contactValue {
-  font-size: clamp(14px, 1.055vw, 16px);
+.contactItems {
+  display: grid;
+  gap: 12px;
+  font-style: normal;
+}
+
+/* The primary action. */
+.contactEmail {
+  --contact-rule: rgb(0 0 0 / 0.16);
+
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--contact-rule);
+  /* 23px at 360, 25px at 390, 26px from 406 up. The address is ~0.49em a
+     character here, so it clears a 360px screen's column with a third of
+     the width still free — it is never truncated and never wraps. */
+  font-size: clamp(22px, 6.4vw, 26px);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  transition: border-color 200ms ease;
+}
+
+.contactEmailText {
+  white-space: nowrap;
+}
+
+/* Light, and a little smaller than the address: it confirms the row is a
+   link without competing with what the link says. */
+.contactArrow {
+  font-size: 0.8em;
+  font-weight: 400;
+  flex: none;
+  transition: transform 200ms ease;
+}
+
+/* The secondary line: the About copy's size and line height, a step back in
+   tone. On desktop its line box is what lands on the copy's last baseline. */
+.contactMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  font-size: 15px;
   letter-spacing: -0.004em;
   line-height: 1.55;
-  justify-self: start;
+  color: rgb(0 0 0 / 0.62);
 }
 
-@media (hover: hover) {
-  a.contactValue:hover {
+.contactSeparator {
+  padding: 0 0.7em;
+}
+
+.contactPhone {
+  transition: opacity 140ms ease;
+}
+
+/* Pointer devices only, so a tap never leaves a hover state behind. The row
+   answers with its own two parts: the hairline comes up to full black and the
+   arrow moves a couple of pixels along its own direction. */
+@media (hover: hover) and (pointer: fine) {
+  .contactEmail:hover {
+    --contact-rule: var(--foreground);
+  }
+
+  .contactEmail:hover .contactArrow {
+    transform: translate(2px, -2px);
+  }
+
+  .contactPhone:hover {
     opacity: 0.45;
   }
-}
-
-a.contactValue {
-  transition: opacity 140ms ease;
 }
 
 @media (max-width: 1099px) {
@@ -153,8 +213,9 @@ a.contactValue {
          Stand beside the idea.          Flank Films is an …
          Move the work forward.          …
                                          …
-         EMAIL        PHONE              …
-         hello@…      +386 …             … responsibility for the result.
+         CONTACT                         …
+         hello@flankfilms.com   ↗        …
+         +386 …  ·  Slovenia             … responsibility for the result.
 
    The About copy spans both rows and so decides the section's height; the
    contact sits at the bottom of the second row, so both columns close on
@@ -211,11 +272,16 @@ a.contactValue {
   .contact {
     grid-area: contact;
     align-self: end;
-    column-gap: clamp(40px, 4.4vw, 80px);
   }
 
-  /* Exactly the copy's size, so the two last lines share a baseline. */
-  .contactValue {
+  /* 24px at 1024, ~29px at 1440, 30px from 1500. */
+  .contactEmail {
+    font-size: clamp(24px, 2vw, 30px);
+  }
+
+  /* Exactly the copy's size, so the two last lines share a baseline and the
+     section still closes on one edge, left and right. */
+  .contactMeta {
     font-size: clamp(15px, 1.055vw, 16px);
   }
 }

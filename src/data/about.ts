@@ -42,6 +42,8 @@ export const aboutParagraphs: string[] = [
 export const contact = {
   email: "hello@flankfilms.com",
   phone: "+386 31 663 288",
+  /** Where the company is. Informational only — no address, no map. */
+  location: "Slovenia",
 } as const;
 
 type FocalPoint = `${number}% ${number}%`;
@@ -50,19 +52,21 @@ export interface AboutReelFilm {
   slug: string;
   /** The project's full-film web derivative — never its homepage preview. */
   src: string;
-  /** Per film: one shared crop cannot frame three different films. */
+  /** Per film: one shared crop cannot frame four different films. */
   focalPoint: { desktop: FocalPoint; mobile: FocalPoint };
 }
 
 /**
- * Framing per film, checked across each whole film in the ~1.4-1.8:1 desktop
- * panel and the 4:5 stacked one. The ski film's skier rides right of centre
- * in its opening shots; the other two are composed on centre.
+ * Framing per film, checked across each whole film in the ~1.64:1 desktop
+ * panel and the 4:5 stacked one. Every film in the reel is 16:9, so the
+ * desktop panel crops them barely at all and the mobile panel crops them
+ * hard on the horizontal — which is the axis these values are really for.
  */
 const REEL_FRAMING: Record<string, AboutReelFilm["focalPoint"]> = {
-  "pingo-2": { desktop: "52% 50%", mobile: "55% 50%" },
+  otp: { desktop: "50% 42%", mobile: "50% 42%" },
+  schweppes: { desktop: "50% 45%", mobile: "52% 45%" },
   "pingo-1": { desktop: "50% 50%", mobile: "50% 50%" },
-  "pingo-3": { desktop: "50% 50%", mobile: "50% 50%" },
+  fresh32: { desktop: "49% 50%", mobile: "49% 50%" },
 };
 const CENTRED: AboutReelFilm["focalPoint"] = {
   desktop: "50% 50%",
@@ -70,37 +74,56 @@ const CENTRED: AboutReelFilm["focalPoint"] = {
 };
 
 /**
- * First-frame stills, for the first paint only. The poster is the first
+ * The reel, in order. Slugs, not a second copy of the project data.
+ *
+ * A curated cut of the work rather than an inventory of it — four films, each
+ * one a different kind of thing, so a visitor who watches the panel for a
+ * minute has seen the range and not the same penguin three times:
+ *
+ *   otp       a branded commercial with actors, and the one AI-Hybrid piece
+ *   schweppes a different aesthetic entirely — product, macro, performance
+ *   pingo-1   the playful character work, and the most varied of the three
+ *             Pingo films: orange studio, Ljubljana, the water slide
+ *   fresh32   a fourth distinct look, close and graphic
+ *
+ * BOHINJ IS DELIBERATELY NOT HERE. It was tried — it is the obvious pick for
+ * visual contrast — and it is the one active film that cannot work in this
+ * panel: it is 1080x1920, and a portrait film in a 1.64:1 frame is cropped to
+ * about a third of its height, which turns every shot into an unreadable band
+ * of sunglasses or fabric. The contrast it would add is vertical, and this
+ * panel has no vertical to give it. It stays whole on the homepage and in the
+ * viewer, where it is framed for.
+ *
+ * pingo-3 was also considered and set aside: it ends on a packshot and then
+ * black, so it would hand the next film a black frame to cut from.
+ */
+const REEL_ORDER = ["otp", "schweppes", "pingo-1", "fresh32"] as const;
+
+/**
+ * Resolved against the homepage's own project data rather than listed here
+ * with paths, so the reel can never name a file the site does not ship and
+ * never falls back to a preview cut. A slug that stops being an active
+ * project simply drops out of the reel instead of breaking it.
+ */
+const reelFilms: AboutReelFilm[] = REEL_ORDER.flatMap((slug) => {
+  const project = visibleProjects.find((entry) => entry.slug === slug);
+  const src = project?.media?.fullVideo;
+  if (!src) return [];
+  return [{ slug, src, focalPoint: REEL_FRAMING[slug] ?? CENTRED }];
+});
+
+/**
+ * First-frame stills, for the first paint only. The poster is the FIRST
  * film's own frame 0, so the crossfade onto the playing film lands on the
  * identical picture. Later films never show a poster: the reel cuts straight
  * from one loaded film to the next.
  */
 const REEL_FIRST_FRAME: Record<string, { poster: string; lqip: string }> = {
-  "pingo-2": {
-    poster: "/media/about/pingo-2-poster.jpg",
-    lqip: "data:image/jpeg;base64,/9j//gAQTGF2YzYyLjExLjEwMAD/2wBDAAgMDA4MDhAQEBAQEBMSExQUFBMTExMUFBQVFRUZGRkVFRUUFBUVGBgZGRscGxoaGRocHB4eHiQkIiIqKiszMz7/xABuAAACAwEAAAAAAAAAAAAAAAABBQIEAwYBAAMBAAAAAAAAAAAAAAAAAAABAgQQAAEDAwMBCAMBAAAAAAAAAAECEQMABDEhUUESgWGSkaFxFBNC8FMiEQACAwEBAAAAAAAAAAAAAAABABEhAhJh/8AAEQgADgAYAwEiAAIRAAMRAP/aAAwDAQACEQMRAD8Ae2/3SSBMfVq2HbXLgY76ZXtksTJldBSgAFBBCd+NT78cV20UaIktGkITsP3WsLiBNwUEsClQJz/ocpLEZ9K0730RURasDmfRBQiSKFABVGhgPyDdjsaPyrf+8XiFQgs4YAyUgs7KUAVAcB21bG+9XehOw8hU16lv/9k=",
+  otp: {
+    poster: "/media/about/otp-poster.jpg",
+    lqip: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAHAAbAAD//gAQTGF2YzYyLjExLjEwMAD/2wBDAAgYGBwYHCEhISEhISckJygoKCcnJycoKCgrKyszMzMrKysoKCsrMDAzMzc5NzQ0MzQ5OTw8PEhIRUVUVFdnZ3z/xABkAAEBAQEAAAAAAAAAAAAAAAAGAwcCAQEBAAAAAAAAAAAAAAAAAAADBBAAAgEDBQADAQAAAAAAAAAAARECAwAhQVESMWGhwZFSEQACAgMBAQAAAAAAAAAAAAAAARExAhKhUiH/wAARCAAOABgDASIAAhEAAxEA/9oADAMBAAIRAxEAPwCka8KVNEjOgWuqtFSr8oh9tHRba3gjzgpRe9tacyQJMvs7PwXHSm2L9G9Suqggjt1jPt3/AC88U4l8mM+H7vrkf6l8WM5FOi9cP//Z",
   },
 };
-
-/**
- * The About reel: every active Pingo film, whole, in homepage order — the
- * large ski film (slot 01), then slot 06, then slot 07 — and round again.
- *
- * Read from the homepage's own project data rather than listed here, so the
- * reel can never name a file the site does not ship, never fall back to a
- * preview cut, and follows the homepage if its Pingo films ever change.
- */
-const reelFilms: AboutReelFilm[] = visibleProjects.flatMap((project) => {
-  const src = project.media?.fullVideo;
-  if (project.title !== "Pingo" || !src) return [];
-  return [
-    {
-      slug: project.slug,
-      src,
-      focalPoint: REEL_FRAMING[project.slug] ?? CENTRED,
-    },
-  ];
-});
 
 const firstFrame = reelFilms[0] ? REEL_FIRST_FRAME[reelFilms[0].slug] : undefined;
 

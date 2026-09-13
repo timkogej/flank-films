@@ -19,6 +19,9 @@
   --card-radius: 10px;
   --header-height: 48px;
   --header-radius: 10px;
+  --header-inset: 14px;   /* header's own side padding */
+  --logo-width: 118px;    /* the centred wordmark */
+  --rule: #e6e6e6;        /* hairline between navigation rows */
 
   /* Typography — calibrated for Helvetica Now proportions.
      Licensed font files are not present; see src/styles/fonts.ts. */
@@ -31,31 +34,43 @@
 @media (max-width: 1099px) {
   :root {
     --header-height: 46px;
+    --header-inset: 12px;
+    --logo-width: 108px;
   }
 }
 
+/* Phones. The bar is MENU + / FLANK / SOCIAL + here — see MobileNav — and it
+   is given the room that arrangement is worth: a taller header, a wider inset
+   than the old squeeze, and nav marks a shade LARGER than the wide header's
+   rather than smaller. The wordmark grows a little with it, enough to anchor a
+   56px bar without becoming a hero graphic.
+
+   --page-gap, --media-gap and --header-gap are untouched: the mosaic below
+   keeps its approved inset and gutters, and only starts lower by the same
+   amount the header grew. */
 @media (max-width: 699px) {
   :root {
     --page-gap: 6px;
     --media-gap: 4px;
     --header-gap: 6px;
-    --header-height: 44px;
-    --nav-size: 11.5px;
+    --header-height: 56px;
+    --header-inset: 14px;
+    --logo-width: 104px;
+    --nav-size-phone: 13px;
+    --nav-tracking-phone: 0.05em;
   }
 }
 
-/* "About & Contact" is long enough that, below ~480px, the primary nav group
-   needs a tighter type/gap treatment to clear the absolutely-centred wordmark
-   without wrapping, colliding, or shrinking the logo. Scoped to :root tokens
-   so it stays part of the same nav type system rather than a one-off. Paired
-   with the header's own inset and gap reduction in Header.module.css — all
-   three levers together keep the size in a comfortable, non-cramped range. */
-@media (max-width: 479px) {
-  :root {
-    --nav-size: 9.5px;
-    --nav-tracking: 0.01em;
-  }
-}
+/* --nav-size is deliberately NOT reduced on phones any more.
+
+   It used to step down to 11.5px, and again to 9.5px with the tracking almost
+   closed below ~480px. Both existed for one reason: "About & Contact" is a
+   long label, and at 360px it had to be shrunk to clear the absolutely-centred
+   wordmark. The phone bar now reads "About" (see Header.tsx), which is short
+   enough that the nav can hold the same 12.5px it has everywhere else — so the
+   marks are set at one size sitewide, and the phone header is legible because
+   it is not compensating for anything. Verified at 360-430px: the left group
+   clears the wordmark with room to spare and nothing wraps. */
 
 *,
 *::before,

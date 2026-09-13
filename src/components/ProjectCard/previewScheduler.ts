@@ -46,8 +46,8 @@ let frame = 0;
  * behind the intro curtain.
  *
  * Intersection is the right question during normal use and the wrong one here:
- * the cards are legitimately off screen, yet in ~1.8 seconds they will all be
- * on it. Without this, the mosaic arrives static and switches on afterwards.
+ * the cards are legitimately off screen, yet by the end of the intro they will
+ * all be on it. Without this, the mosaic arrives static and switches on afterwards.
  * So this is a declared state, not a fudged bounding box — the observer keeps
  * reporting the truth and this flag says the truth is briefly not the point.
  */
@@ -167,6 +167,85 @@ export function setPreviewPrewarm(on: boolean): void {
   if (prewarming === on) return;
   prewarming = on;
   invalidate();
+}
+
+/* ------------------------------------------------------------ stills first */
+
+/**
+ * Longest any preview video waits for the mosaic's stills. Only reached when
+ * an image neither loads nor errors — a stalled request must not strand every
+ * preview on the page.
+ */
+const STILLS_CAP_MS = 5000;
+
+const pendingStills = new Set<HTMLImageElement>();
+const stillWaiters = new Set<() => void>();
+let stillCheck = 0;
+
+function releaseIfSettled(): void {
+  stillCheck = 0;
+  if (pendingStills.size > 0) return;
+  const ready = [...stillWaiters];
+  stillWaiters.clear();
+  for (const release of ready) release();
+}
+
+/**
+ * Deferred by a task, not checked inline: every card in a commit registers its
+ * still in the same effect pass, and the first card must not see a mosaic of
+ * one and conclude everything has landed.
+ */
+function scheduleStillCheck(): void {
+  if (!stillCheck) stillCheck = window.setTimeout(releaseIfSettled, 0);
+}
+
+/**
+ * Count one card's still towards the mosaic's first composition. Returns its
+ * teardown. `complete` and the listeners are read in the same task, so a load
+ * cannot slip between them.
+ */
+export function trackStill(img: HTMLImageElement): () => void {
+  if (img.complete) return () => {};
+  pendingStills.add(img);
+  const settle = () => {
+    img.removeEventListener("load", settle);
+    img.removeEventListener("error", settle);
+    if (pendingStills.delete(img)) scheduleStillCheck();
+  };
+  img.addEventListener("load", settle);
+  img.addEventListener("error", settle);
+  return settle;
+}
+
+/**
+ * Run `release` once every tracked still has loaded or failed.
+ *
+ * The per-card version of this rule — a card's video waits for its own still —
+ * was not enough: the first stills to land released multi-megabyte preview
+ * files that then starved the largest remaining stills of the same pipe, so on
+ * a moderate connection the page rose with posters still missing. The stills
+ * are one composition and the guarantee layer, so the video enhancement waits
+ * for all of them. On a fast connection they settle in tens of milliseconds and
+ * nothing about the prewarm changes; during the intro this is what makes the
+ * extra time turn into posters on the page when it arrives.
+ */
+export function afterStills(release: () => void): () => void {
+  let done = false;
+  const once = () => {
+    if (done) return;
+    done = true;
+    window.clearTimeout(cap);
+    stillWaiters.delete(once);
+    release();
+  };
+  const cap = window.setTimeout(once, STILLS_CAP_MS);
+  stillWaiters.add(once);
+  scheduleStillCheck();
+  return () => {
+    done = true;
+    window.clearTimeout(cap);
+    stillWaiters.delete(once);
+  };
 }
 
 /** Whether a project film is currently open over the mosaic. */

@@ -15,6 +15,9 @@ import {
   DARK_LIGHT_MODE,
   DARK_LIGHT_REDUCED,
   DARK_LIGHT_TOTAL_MS,
+  INTRO_SCORE,
+  introMarks,
+  type IntroProfile,
   WORDMARK,
 } from "./darkLightConfig";
 import { DarkLightDevPanel } from "./DarkLightDevPanel";
@@ -35,6 +38,29 @@ const DEV = process.env.NODE_ENV !== "production";
  * answered by React itself: no storage, no URL flag, no route listener, and
  * nothing that survives a reload to suppress the next one.
  */
+/**
+ * The score, as the custom properties the stylesheet animates with. Both
+ * profiles are emitted and the stylesheet picks one per breakpoint, so the
+ * numbers live only in darkLightConfig and the server's first paint already
+ * carries them — no client measurement, nothing to hydrate into place.
+ */
+function scoreVars(prefix: string, p: IntroProfile) {
+  const m = introMarks(p);
+  return {
+    [`--${prefix}-shine-delay`]: `${m.shineStart}ms`,
+    [`--${prefix}-shine-duration`]: `${p.shineDuration}ms`,
+    [`--${prefix}-rise-delay`]: `${m.riseStart}ms`,
+    [`--${prefix}-rise-duration`]: `${p.riseDuration}ms`,
+  };
+}
+
+const SCORE_STYLE = {
+  ...scoreVars("desktop", INTRO_SCORE.desktop),
+  ...scoreVars("phone", INTRO_SCORE.phone),
+  "--reduced-hold": `${DARK_LIGHT_REDUCED.hold}ms`,
+  "--reduced-fade": `${DARK_LIGHT_REDUCED.fade}ms`,
+} as React.CSSProperties;
+
 const noSubscription = () => () => {};
 const onClient = () => false;
 const onServerOrHydrating = () => true;
@@ -260,6 +286,7 @@ export function DarkLightIntro({
     <div
       ref={stage}
       className={running ? `${styles.stage} ${styles.running}` : styles.stage}
+      style={SCORE_STYLE}
     >
       {running && (
         <div key={run} className={styles.curtain} aria-hidden="true">

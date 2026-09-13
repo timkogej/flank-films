@@ -21,6 +21,36 @@ export const social = {
 } as const;
 
 /**
+ * The site's own pages, in header order.
+ *
+ * Two destinations, because the site has two. The header renders this on a
+ * wide bar and the phone menu renders the same list in its own shape — one
+ * array, so a page can never appear in one and not the other.
+ *
+ * `label` is the wide-bar wording and `short` the phone wording. They differ
+ * for exactly one entry: a phone bar says ABOUT, where the desktop bar has the
+ * room to say ABOUT & CONTACT. Same href either way — the About page carries
+ * the contact details, so the shorter word loses nothing.
+ */
+export const pages = [
+  { key: "home", href: "/", label: "Home", short: "Home" },
+  {
+    key: "about",
+    href: "/about",
+    label: "About & Contact",
+    short: "About",
+  },
+] as const;
+
+export type PageKey = (typeof pages)[number]["key"];
+
+/** The social accounts, in header order. Same order in the phone menu. */
+export const socialLinks = [
+  { key: "instagram", label: "Instagram", href: social.instagram },
+  { key: "linkedin", label: "LinkedIn", href: social.linkedin },
+] as const;
+
+/**
  * Development-only affordance: the small project number drawn on each
  * placeholder frame. It exists purely to make the mosaic reviewable while the
  * real media is missing and is NOT part of the design.

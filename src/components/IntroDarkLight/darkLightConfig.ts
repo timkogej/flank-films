@@ -1,8 +1,8 @@
 /**
  * DARK LIGHT intro — the whole score in one table.
  *
- * Every number that decides how the piece feels lives here or in the matching
- * custom properties at the top of DarkLightIntro.module.css. Nothing is tuned
+ * Every number that decides how the piece feels lives here (all pacing) or in
+ * the custom properties at the top of DarkLightIntro.module.css (the look). Nothing is tuned
  * inside a selector further down that file, and nothing is tuned in the
  * component: React owns what exists and when the sequence is over, CSS owns
  * every frame.
@@ -31,56 +31,95 @@
 export const DARK_LIGHT_MODE: "every-load" | "off" = "every-load";
 
 /**
- * Choreography, in milliseconds, as absolute marks on one timeline rather
- * than a pile of delays and durations — that is the form the piece is
- * actually judged in ("the reflection leaves the K at 1.08s"), so it is the
- * form it is written in. The durations CSS needs are derived below.
+ * Choreography, in milliseconds — the ONLY place the intro's pacing is
+ * written down. Four beats, played back to back, one sequence:
+ *
+ *   initialHold    graphite field, black FLANK already sitting in it, and
+ *                  nothing moving. Long enough to register the mark as the
+ *                  mark before anything happens to it.
+ *   shineDuration  the one reflection, from touching the F to clearing the K.
+ *   postShineHold  the mark black again, still — a beat, not a second scene.
+ *   riseDuration   the real page rising from the bottom edge until seated.
  *
  * The mark does not arrive. It is already there in the first painted frame,
  * at full size and full contrast, and it never moves — so there is no reveal
- * beat on this timeline at all. The only thing that travels is the light.
+ * beat here at all. The only thing that travels is the light, then the page.
  *
- *   0      dark graphite field, black FLANK already sitting in it
- *   180    the reflection reaches the F
- *   1080   it has left the K; the mark is black again
- *   1300   end of the hold
- *   1300   the real homepage starts rising from the bottom edge
- *   1940   the homepage is seated; the intro is over
+ * Pacing was lengthened from a ~1.94s score (180 / 900 / 220 / 640) because
+ * the mark went by before it was read. The extra time is also real preload
+ * time: the page is mounted behind the curtain from the first frame and its
+ * posters, preview loops and first About film load while this plays. It is
+ * never a loading gate — the score is fixed and nothing here waits on media.
+ *
+ * The holds read longer than they are written, on purpose: the reflection
+ * field's leading and trailing ~15-20% carry almost no light on the mark, so
+ * the eye sees roughly 570ms of stillness before the light and 500ms after it.
+ * That is why the written holds sit at the low end of what was tried: longer,
+ * and the post-shine beat stops being a beat and becomes a pause.
+ *
+ * `phone` applies at the stylesheet's `max-width: 699px` breakpoint. It runs
+ * a touch shorter: the mark is physically smaller, so the same light crosses
+ * it in less real distance and reads as slower at the same duration.
+ *
+ * The component hands these to the stylesheet as custom properties on the
+ * stage, server-rendered, so CSS never carries a second copy of a number.
  */
-export const DARK_LIGHT_SCORE = {
-  shineStart: 180,
-  shineEnd: 1080,
-  holdEnd: 1300,
-  pageRiseStart: 1300,
-  pageRiseEnd: 1940,
+export const INTRO_SCORE = {
+  desktop: {
+    initialHold: 380,
+    shineDuration: 1200,
+    postShineHold: 320,
+    riseDuration: 740,
+  },
+  phone: {
+    initialHold: 360,
+    shineDuration: 1160,
+    postShineHold: 300,
+    riseDuration: 700,
+  },
 } as const;
 
-/** Durations CSS animates over. Derived, never written down twice. */
-export const DARK_LIGHT_TIMING = {
-  staticHold: DARK_LIGHT_SCORE.shineStart,
-  shineDelay: DARK_LIGHT_SCORE.shineStart,
-  shine: DARK_LIGHT_SCORE.shineEnd - DARK_LIGHT_SCORE.shineStart,
-  hold: DARK_LIGHT_SCORE.holdEnd - DARK_LIGHT_SCORE.shineEnd,
-  riseDelay: DARK_LIGHT_SCORE.pageRiseStart,
-  rise: DARK_LIGHT_SCORE.pageRiseEnd - DARK_LIGHT_SCORE.pageRiseStart,
-} as const;
+export type IntroProfile = (typeof INTRO_SCORE)[keyof typeof INTRO_SCORE];
+
+/**
+ * The same score as absolute marks on the timeline — the form the piece is
+ * judged in ("the reflection leaves the K at 1.58s") — and the delays CSS
+ * needs. Derived, never written down twice.
+ *
+ *   desktop   0 → 380 hold · 380 → 1580 shine · 1580 → 1900 hold · 1900 → 2640 rise
+ *   phone     0 → 360 hold · 360 → 1520 shine · 1520 → 1820 hold · 1820 → 2520 rise
+ */
+export function introMarks(p: IntroProfile) {
+  const shineStart = p.initialHold;
+  const shineEnd = shineStart + p.shineDuration;
+  const riseStart = shineEnd + p.postShineHold;
+  const riseEnd = riseStart + p.riseDuration;
+  return { shineStart, shineEnd, riseStart, riseEnd } as const;
+}
 
 /**
  * The desktop total.
  *
  * Only a fallback: the component ends the sequence on the riser animation's
  * own `finished`, so pausing it or running it at 0.5x cannot desynchronise the
- * overlay from the page, and the phone profile's slightly different numbers
- * (see the `max-width: 699px` block in the stylesheet) need no second constant
- * to stay correct. This value is used only if an engine reports no animations.
+ * overlay from the page, and the phone profile needs no second constant to
+ * stay correct. The longer of the two is used, so the fallback can never cut
+ * a sequence short. Used only if an engine reports no animations.
  */
-export const DARK_LIGHT_TOTAL_MS = DARK_LIGHT_SCORE.pageRiseEnd;
+export const DARK_LIGHT_TOTAL_MS = Math.max(
+  introMarks(INTRO_SCORE.desktop).riseEnd,
+  introMarks(INTRO_SCORE.phone).riseEnd,
+);
 
 /**
  * Reduced motion: the object is drawn once and held, then taken away. No
  * travelling light, no travelling page. Deliberately not "the same thing,
  * slower" — and because the mark is static in the full version anyway, the
  * reduced path is the same frame, simply without the reflection.
+ *
+ * Deliberately NOT scaled with INTRO_SCORE: the longer cinematic pacing is for
+ * the travelling light, and a visitor who asked for less motion should not wait
+ * through it. 520ms total.
  */
 export const DARK_LIGHT_REDUCED = { hold: 320, fade: 200 } as const;
 

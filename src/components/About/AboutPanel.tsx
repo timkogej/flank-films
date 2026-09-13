@@ -25,8 +25,9 @@ function telHref(phone: string): string | null {
  * Stacked, the order is simply statement, About, contact.
  *
  * One surface, not cards — the columns exist only as grid tracks, with no
- * borders or backgrounds of their own. Contact is editorial metadata (small
- * label, plain value), not a call to action.
+ * borders or backgrounds of their own. The contact block is the page's sign-off
+ * and has one primary action — the email, large, with phone and location as a
+ * quiet line beneath it.
  *
  * The left track carries the brand statement. It is the page's h1: real
  * approved copy, set as type. There is deliberately NO typographic "FLANK"
@@ -55,24 +56,39 @@ export function AboutPanel() {
         ))}
       </div>
 
-      <address className={styles.contact}>
-        <div className={styles.contactItem}>
-          <span className={styles.contactLabel}>Email</span>
-          <a className={styles.contactValue} href={`mailto:${contact.email}`}>
-            {contact.email}
+      <div className={styles.contact}>
+        {/* Names the block and nothing more: small, uppercase, and a long way
+            below the email it introduces. */}
+        <h2 className={styles.contactHeading}>Contact</h2>
+
+        <address className={styles.contactItems}>
+          {/* The one action on the page, set as an editorial row rather than
+              a button: the address large, a light outbound mark at the end of
+              the line, and a hairline under both. */}
+          <a className={styles.contactEmail} href={`mailto:${contact.email}`}>
+            <span className={styles.contactEmailText}>{contact.email}</span>
+            <span className={styles.contactArrow} aria-hidden="true">
+              ↗
+            </span>
           </a>
-        </div>
-        <div className={styles.contactItem}>
-          <span className={styles.contactLabel}>Phone</span>
-          {phoneHref ? (
-            <a className={styles.contactValue} href={phoneHref}>
-              {contact.phone}
-            </a>
-          ) : (
-            <span className={styles.contactValue}>{contact.phone}</span>
-          )}
-        </div>
-      </address>
+
+          {/* Secondary metadata, at the About copy's own size. Location is
+              informational, so it is text and not a link. */}
+          <p className={styles.contactMeta}>
+            {phoneHref ? (
+              <a className={styles.contactPhone} href={phoneHref}>
+                {contact.phone}
+              </a>
+            ) : (
+              <span>{contact.phone}</span>
+            )}
+            <span className={styles.contactSeparator} aria-hidden="true">
+              ·
+            </span>
+            <span>{contact.location}</span>
+          </p>
+        </address>
+      </div>
     </section>
   );
 }
