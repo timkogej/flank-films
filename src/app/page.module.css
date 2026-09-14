@@ -1,4 +1,8 @@
-/* The homepage shell: outer inset, header, tiny gap, mosaic. */
+/* The homepage shell: outer inset, header panel, tiny gap, content frame.
+
+   Everything sits on HomeBackdrop, which shows through the outer inset, the
+   header gap and around every rounded corner. The geometry is real layout —
+   padding and gaps from the tokens in globals.css — never a scale transform. */
 /* Device insets. `max()` so a phone without them is unchanged to the pixel,
    and a notched one keeps the interface out of the unsafe area. Paired with
    viewport-fit=cover in the document viewport. */
@@ -14,10 +18,23 @@
   min-height: 100dvh;
 }
 
+/* The content frame: an opaque white panel around the mosaic. Its inset is
+   the mosaic's own gutter, and its radius is the card radius plus that inset,
+   so the frame's corners are concentric with the cards' — one curve family,
+   not two unrelated ones.
+
+   No overflow clipping: the frame is a solid colour, so the radius needs none,
+   and keyboard focus rings on the cards must never be cut off. */
 .main {
   display: flex;
   min-height: 0;
-  flex: 1 1 auto;
+  padding: var(--frame-inset);
+  border-radius: var(--frame-radius);
+  background: var(--background);
+  /* Below desktop the page scrolls and the frame is exactly as tall as the
+     mosaic. Were it to grow into a short viewport it would become a white tail
+     under the last frame; the backdrop takes that space instead. */
+  flex: 0 0 auto;
 }
 
 .main > * {
@@ -31,5 +48,9 @@
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .main {
+    flex: 1 1 auto;
   }
 }

@@ -83,7 +83,11 @@
 @media (min-width: 700px) and (max-width: 1099px) {
   .mosaic {
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-auto-rows: calc((100vw - 2 * var(--page-gap)) / 14);
+    /* Rows follow the grid's width, which the content frame's inset now
+       narrows too — so the frames keep their proportions exactly. */
+    grid-auto-rows: calc(
+      (100vw - 2 * var(--page-gap) - 2 * var(--frame-inset)) / 14
+    );
   }
 
   .mosaic > [data-slot="01"] {

@@ -23,6 +23,14 @@
   --logo-width: 122px;    /* the centred wordmark */
   --rule: #e6e6e6;        /* hairline between navigation rows */
 
+  /* Framed shell (homepage). The content frame's inner inset is the mosaic's
+     own gutter, and its radius is concentric with the cards inside it. */
+  --frame-inset: var(--media-gap);
+  --frame-radius: calc(var(--card-radius) + var(--frame-inset));
+  /* HomeBackdrop's tone before any pixel of the film has arrived: the average
+     of the Ljubljana Pingo cut, so the load is a sharpening, not a flash. */
+  --backdrop-fallback: #9a8c7a;
+
   /* Typography — calibrated for Helvetica Now proportions.
      Licensed font files are not present; see src/styles/fonts.ts. */
   --font-brand: "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -58,6 +66,35 @@
     --logo-width: 108px;
     --nav-size-phone: 13.5px;
     --nav-tracking-phone: 0.05em;
+  }
+}
+
+/* ==========================================================================
+   The framed shell — homepage only.
+
+   Keyed on the shell's own attribute so no route has to opt out, and the
+   tokens reach the mobile menu too: it is portaled into <body>, outside the
+   shell, and its bar must land on the header with the header's radius. /about
+   does not carry the attribute and keeps every value above exactly.
+
+   Stacking model, low to high (all within existing contexts, no new numbers):
+     HomeBackdrop        z -1 inside the intro riser
+     page shell          in flow inside the riser (riser: z 1)
+     intro curtain       reduced-motion fade only (z 2 within the stage)
+     mobile menu         z 60, portaled to <body>
+     project viewer      z 100, sibling of the site root
+     consent banner      z 1200
+   ========================================================================== */
+:root:has([data-framed-shell]) {
+  /* The header panel shares the content frame's curve. */
+  --header-radius: var(--frame-radius);
+}
+
+/* A touch more film around the wide composition. Tablet (8px) and phone
+   (6px) keep their inset: there the media's width is worth more than border. */
+@media (min-width: 1100px) {
+  :root:has([data-framed-shell]) {
+    --page-gap: 10px;
   }
 }
 

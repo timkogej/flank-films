@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -62,6 +64,17 @@ const SCORE_STYLE = {
   "--reduced-hold": `${DARK_LIGHT_REDUCED.hold}ms`,
   "--reduced-fade": `${DARK_LIGHT_REDUCED.fade}ms`,
 } as React.CSSProperties;
+
+/**
+ * Whether the entrance is still running over the page. Read-only, for page
+ * behaviour that must not start while the page is parked behind the curtain
+ * (the homepage backdrop's hover switching). Changes nothing about the intro.
+ */
+const IntroRunningContext = createContext(false);
+
+export function useIntroRunning(): boolean {
+  return useContext(IntroRunningContext);
+}
 
 const noSubscription = () => () => {};
 const onClient = () => false;
@@ -429,7 +442,9 @@ export function DarkLightIntro({
         </div>
       )}
       <div ref={riser} className={styles.riser}>
-        {children}
+        <IntroRunningContext.Provider value={running}>
+          {children}
+        </IntroRunningContext.Provider>
       </div>
 
       {DEV && controls && (

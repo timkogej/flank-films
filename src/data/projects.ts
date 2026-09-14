@@ -117,6 +117,13 @@ export interface Project {
   desktopFocalPoint?: FocalPoint;
   /** object-position for tall/narrow frames. */
   mobileFocalPoint?: FocalPoint;
+  /**
+   * object-position when this project is the full-viewport homepage backdrop.
+   * Only the thin edges around the framed shell are ever seen, so this is
+   * tuned for those edges, not for the hidden centre. Falls back to
+   * `desktopFocalPoint`.
+   */
+  backdropFocalPoint?: FocalPoint;
   /** Set false to keep a slot in the data but out of the mosaic. */
   enabled?: boolean;
 }
@@ -496,6 +503,8 @@ export const projects: Project[] = [
     },
     desktopFocalPoint: "50% 52%",
     mobileFocalPoint: "50% 51%",
+    // The default backdrop, approved centred.
+    backdropFocalPoint: "50% 50%",
   },
   {
     // The closer, in the wide bottom frame. Same film and same derivatives as
@@ -577,4 +586,36 @@ export function getAdjacentProjects(slug: string): {
 /** The canonical URL of a project. The one place the /work prefix is written. */
 export function projectHref(project: Project): string {
   return `/work/${project.slug}`;
+}
+
+/** What the homepage backdrop needs to show one project. */
+export interface ProjectBackdrop {
+  /** Identity: the same key is never re-requested or re-faded. */
+  key: string;
+  /** The loop, when the project has one. */
+  video?: string;
+  /** The still: the whole backdrop for a still project, the fallback for the
+   *  rest. Always the card's own poster, so it is already in the cache. */
+  image?: string;
+  position: string;
+}
+
+/**
+ * A project as backdrop media, derived from the same fields the card uses —
+ * so a new project, a reorder or a changed source needs no second mapping.
+ */
+export function projectBackdrop(project: Project): ProjectBackdrop {
+  const { media } = project;
+  return {
+    key: project.slug,
+    video: project.previewMode === "still" ? undefined : media?.previewVideo,
+    image: media?.poster,
+    position:
+      project.backdropFocalPoint ?? project.desktopFocalPoint ?? "50% 50%",
+  };
+}
+
+/** Resolve a card's slot id — the attribute every mosaic frame carries. */
+export function getProjectBySlot(slot: string): Project | undefined {
+  return visibleProjects.find((project) => project.id === slot);
 }

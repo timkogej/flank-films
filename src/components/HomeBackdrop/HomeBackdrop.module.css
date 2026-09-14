@@ -1,0 +1,93 @@
+/* The film behind the framed homepage.
+
+   Fixed, and deliberately NOT `inset: 0`. The backdrop lives inside the
+   intro's riser, and while the riser animates a transform it is the containing
+   block for `position: fixed`. `inset: 0` would then stretch over the whole
+   riser — several viewports tall on a phone — and the crop would jump when the
+   intro hands back. `top/left/right: 0` + a viewport height is the SAME box in
+   both containing blocks at scroll 0, so nothing moves when the transform
+   clears.
+
+   `lvh`: the large viewport, so Safari's collapsing toolbar never uncovers an
+   edge and the element never resizes mid-scroll (no re-crop, no relayout).
+
+   Stacking: -1 inside the riser's stacking context — above the riser's own
+   white surface, below every piece of the page. Out of flow, so it adds
+   nothing to the document's height or width. */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100lvh;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* Layer 0: the source's own tone, then its inline LQIP. Never white, never
+     black, painted with the document. */
+  background-color: var(--backdrop-fallback);
+  background-image: var(--lqip, none);
+  background-size: cover;
+  background-position: center;
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* The controller's two layers. Roles, not animation state, live in the DOM:
+
+     standby   invisible, beneath everything, paused (keeps its source)
+     incoming  invisible, on top, preparing — nothing is ever faded into
+               before it has a real frame
+     fading    on top, opacity 0 → 1 over the front, which stays opaque
+               beneath it: one surface replaces another, no luminance dip
+     front     opaque, the media at rest
+
+   Only `fading` carries a transition, so every other role change is instant
+   and invisible. The duration matches BACKDROP_FADE_MS. */
+.layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 0;
+}
+
+.layer[data-role="incoming"] {
+  z-index: 2;
+}
+
+.layer[data-role="fading"] {
+  z-index: 2;
+  opacity: 1;
+  transition: opacity 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.layer[data-role="front"] {
+  z-index: 1;
+  opacity: 1;
+}
+
+/* Inside a layer the still is always underneath and the video sits over it,
+   hidden until it presents a real frame. Revealed while the layer is invisible
+   it appears at once; revealed on a visible layer (a slow load that has
+   already crossfaded to its still) it fades over the still. Either way the
+   layer itself is never less than opaque content. */
+.layer video {
+  opacity: 0;
+}
+
+.layer[data-video="shown"] video {
+  opacity: 1;
+}
+
+.layer[data-role="fading"] video,
+.layer[data-role="front"] video {
+  transition: opacity 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
