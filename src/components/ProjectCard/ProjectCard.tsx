@@ -104,6 +104,9 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
       style={style}
       data-slot={project.id}
       data-preview={previewMode}
+      data-project-slug={project.slug}
+      data-project-name={project.title}
+      data-project-position={index + 1}
       aria-label={label}
     >
       {contents}

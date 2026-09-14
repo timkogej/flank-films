@@ -28,7 +28,11 @@ export type ProjectFormat =
   | "social"
   | "photography";
 
-export type ProductionMode = "AI" | "AI-Hybrid";
+export type ProductionMode =
+  | "AI"
+  | "AI-Edit"
+  | "AI-Hybrid"
+  | "AI-Hybrid · 3D animation";
 
 export interface ProjectMedia {
   /**
@@ -398,7 +402,7 @@ export const projects: Project[] = [
     slug: "petrol",
     title: "Petrol",
     campaign: "OOH Billboard",
-    productionMode: "AI",
+    productionMode: "AI-Edit",
     year: 2026,
     format: "photography",
     previewMode: "still",
@@ -503,7 +507,7 @@ export const projects: Project[] = [
     title: "OTP Banka",
     campaign: "Pogumno je iti na zmago",
     // The one active project that is not plain AI.
-    productionMode: "AI-Hybrid",
+    productionMode: "AI-Hybrid · 3D animation",
     year: 2026,
     format: "commercial",
     previewMode: "autoplay",

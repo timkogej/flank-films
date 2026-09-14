@@ -1,9 +1,8 @@
 /**
  * About + Contact page content.
  *
- * The About copy below is final, approved brand copy. The phone number is
- * real; the email address is still a placeholder — see the TODO on that
- * export.
+ * The About copy below is final, approved brand copy. Company identity and
+ * contact details live in `lib/site.ts`, the shared public source of truth.
  */
 
 import { visibleProjects } from "@/data/projects";
@@ -31,20 +30,6 @@ export const aboutParagraphs: string[] = [
   "Our name reflects our role. To stand beside the people behind the idea. To bring creative judgment, technical ingenuity and a shared commitment to making the work as strong as it can be. We combine filmmaking craft with AI and AI-hybrid production, opening up new possibilities for what can be imagined and brought to screen.",
   "Our vision is to help shape the next generation of European production, giving creative teams greater freedom to explore, the confidence to push further, and a partner who takes responsibility for the result.",
 ];
-
-/**
- * TODO: replace the email with the real business address.
- *
- * The phone number is real. It is written here the way it should read on the
- * page — spaced, in international form — and AboutPanel derives the `tel:`
- * href from it, so there is exactly one place the number is written down.
- */
-export const contact = {
-  email: "hello@flankfilms.com",
-  phone: "+386 31 663 288",
-  /** Where the company is. Informational only — no address, no map. */
-  location: "Slovenia",
-} as const;
 
 type FocalPoint = `${number}% ${number}%`;
 

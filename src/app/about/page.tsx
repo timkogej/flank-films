@@ -5,10 +5,32 @@ import { FlankLightPanel } from "@/components/About/FlankLightPanel";
 import { VisualPanel } from "@/components/About/VisualPanel";
 import { Header } from "@/components/Header/Header";
 import { DarkLightIntro } from "@/components/IntroDarkLight/DarkLightIntro";
+import { aboutSeo, site } from "@/lib/site";
+import { StructuredData } from "@/lib/structuredData";
 
 import styles from "./page.module.css";
 
-export const metadata: Metadata = { title: "About" };
+export const metadata: Metadata = {
+  title: aboutSeo.title,
+  description: aboutSeo.description,
+  alternates: {
+    canonical: "/about",
+  },
+  openGraph: {
+    type: "website",
+    siteName: site.legalName,
+    title: `${aboutSeo.title} — ${site.legalName}`,
+    description: aboutSeo.description,
+    url: "/about",
+    images: [site.socialImage],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${aboutSeo.title} — ${site.legalName}`,
+    description: aboutSeo.description,
+    images: [site.socialImage],
+  },
+};
 
 /**
  * About + Contact.
@@ -28,17 +50,20 @@ export const metadata: Metadata = { title: "About" };
  */
 export default function AboutPage() {
   return (
-    <DarkLightIntro>
-      <div className={styles.shell}>
-        <Header current="about" />
-        <main className={styles.main}>
-          <AboutPanel />
-          <section className={styles.visuals} aria-label="FLANK">
-            <FlankLightPanel />
-            <VisualPanel />
-          </section>
-        </main>
-      </div>
-    </DarkLightIntro>
+    <>
+      <StructuredData page="about" />
+      <DarkLightIntro>
+        <div className={styles.shell}>
+          <Header current="about" />
+          <main className={styles.main}>
+            <AboutPanel />
+            <section className={styles.visuals} aria-label="FLANK">
+              <FlankLightPanel />
+              <VisualPanel />
+            </section>
+          </main>
+        </div>
+      </DarkLightIntro>
+    </>
   );
 }

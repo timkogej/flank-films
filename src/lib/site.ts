@@ -1,23 +1,45 @@
 /**
  * Central site configuration.
  *
- * Social URLs are PLACEHOLDERS — final accounts are not confirmed yet.
- * They are kept here so no fake URL is ever scattered through a component.
+ * Social URLs live here, and only here, so no URL is ever scattered through
+ * a component.
  */
 
 export const site = {
   name: "FLANK",
   legalName: "FLANK FILMS",
+  title: "FLANK FILMS — Commercial Production for Agencies",
   description:
-    "FLANK FILMS — commercial production company. Films, advertising and visual content for agencies and brands.",
+    "Independent commercial production for creative agencies and brands, combining filmmaking craft, AI and AI-hybrid production from Slovenia across Europe.",
+  entityDescription:
+    "FLANK FILMS is an independent commercial production company in Slovenia, partnering with creative agencies and brands across Europe on commercial films, AI production and AI-hybrid production.",
   url: "https://flankfilms.com",
+  logo: "/brand/flank-wordmark-black.svg",
+  socialImage: {
+    url: "/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "FLANK FILMS wordmark",
+  },
+} as const;
+
+export const aboutSeo = {
+  title: "About & Contact",
+  description:
+    "Meet FLANK FILMS, an independent production company in Slovenia. Explore our filmmaking, AI and AI-hybrid approach for agencies, and get in touch.",
 } as const;
 
 export const social = {
-  /** TODO: replace with the final FLANK Instagram account. */
-  instagram: "https://www.instagram.com/",
-  /** TODO: replace with the final FLANK LinkedIn page. */
-  linkedin: "https://www.linkedin.com/",
+  instagram: "https://www.instagram.com/flankfilms/",
+  linkedin: "https://www.linkedin.com/company/flankfilms",
+} as const;
+
+export const contact = {
+  email: "hello@flankfilms.com",
+  phone: "+386 31 663 288",
+  telephone: "+38631663288",
+  location: "Slovenia",
+  countryCode: "SI",
 } as const;
 
 /**

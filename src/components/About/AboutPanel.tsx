@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "@/components/ArrowUpRight/ArrowUpRight";
-import { aboutParagraphs, brandStatement, contact } from "@/data/about";
+import { aboutParagraphs, brandStatement } from "@/data/about";
+import { contact } from "@/lib/site";
 
 import styles from "./AboutPanel.module.css";
 

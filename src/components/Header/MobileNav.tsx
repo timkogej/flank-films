@@ -425,7 +425,11 @@ export function MobileNav({ current }: { current: PageKey }) {
   const markText = (word: string, sign: string) => (
     <>
       {word}
-      <span className={styles.sign} aria-hidden="true">
+      <span
+        className={styles.sign}
+        data-sign={sign === "+" ? "plus" : "minus"}
+        aria-hidden="true"
+      >
         {sign}
       </span>
     </>

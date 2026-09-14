@@ -1,4 +1,6 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+
+import { getProjectBySlug } from "@/data/projects";
 
 /**
  * The standalone project route — currently not a public experience.
@@ -29,6 +31,13 @@ import { redirect } from "next/navigation";
  * a standalone project, `mode="page"`, unchanged and still tested by nothing
  * else that had to be touched here.
  */
-export default function ProjectPage() {
+export default async function ProjectPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  if (!getProjectBySlug(slug)) notFound();
+
   redirect("/");
 }

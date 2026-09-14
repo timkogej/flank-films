@@ -68,6 +68,20 @@
   margin-left: 0.42em;
 }
 
+/* Optical centring on the capitals. In the brand face both signs are drawn on
+   the maths axis, which sits below the middle of an uppercase word: measured
+   from rendered ink at 13px, + hangs 1.1-1.3px low and – 1.1px low, in both
+   Chromium and WebKit. Each is lifted by its own measured amount, in em so it
+   scales with the type. A transform, so the box, the line and the button
+   around it do not move by a pixel. */
+.sign[data-sign="plus"] {
+  transform: translateY(-0.09em);
+}
+
+.sign[data-sign="minus"] {
+  transform: translateY(-0.085em);
+}
+
 /* Both states of a shell mark, stacked in one cell. The cell is as wide as
    the wider state, so the button's box is identical before, during and after
    a swap. The left mark ranges its words left and the right mark ranges them

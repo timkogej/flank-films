@@ -90,25 +90,50 @@ export function VisualPanel() {
     const wantsPlay = () =>
       wantsVideo() && onScreen && document.visibilityState !== "hidden";
 
+    /** A play() request is in flight on this element. */
+    const starting = new WeakSet<HTMLVideoElement>();
+    /** Its last request was refused; asked again only on a readiness event. */
+    const refused = new WeakSet<HTMLVideoElement>();
+
     const play = (video: HTMLVideoElement) => {
+      if (starting.has(video) || refused.has(video)) return;
+      // Stated at the moment of asking: iOS grants muted autoplay only to an
+      // element it can see is muted and inline now.
+      video.muted = true;
+      video.playsInline = true;
+      starting.add(video);
       const started = video.play();
-      if (!started) return;
+      if (!started) {
+        starting.delete(video);
+        return;
+      }
       started
         .then(() => {
+          starting.delete(video);
           // A late resolution must never override newer intent.
           if (video !== front || !wantsPlay()) video.pause();
         })
-        .catch(() => {
-          /* refused or interrupted — the current frame is already correct */
+        .catch((error: unknown) => {
+          starting.delete(video);
+          // Interrupted by our own pause() — intended. Anything else waits
+          // for the element to report progress. The current frame is already
+          // correct either way.
+          if (!(error instanceof DOMException && error.name === "AbortError")) {
+            refused.add(video);
+          }
         });
     };
 
     const sync = () => {
       if (waiting) return;
       if (wantsPlay()) {
-        if (front.paused && !front.ended && front.readyState >= HAS_FRAME) {
-          play(front);
-        }
+        // Not gated on a decoded frame. Waiting for `loadeddata` before asking
+        // made the start a relay — source, frame, observer, play() — and on
+        // iOS, which does not buffer ahead until playback is requested, the
+        // frame could wait on the request that was waiting on the frame. The
+        // browser starts the moment it can; the poster (this film's own frame
+        // 0) covers the gap, so there is nothing to see until it moves.
+        if (front.src && front.paused && !front.ended) play(front);
         return;
       }
       // Pause only. currentTime is never touched, so scrolling away and back
@@ -176,11 +201,21 @@ export function VisualPanel() {
       // The very first film only: fade in over the poster — which is its
       // own first frame, so nothing appears to change.
       if (wantsVideo()) front.classList.add(styles.videoShown);
+      refused.delete(front);
       sync();
     };
 
     const onPlaying = (event: Event) => {
       if (event.target === front) queueStandby();
+    };
+
+    // The element can now do more than when it was last asked: the moment a
+    // refused or premature request is worth repeating. Event-driven, so a
+    // refusal costs at most one retry per stage of loading — never a loop.
+    const onReadiness = (event: Event) => {
+      const video = event.target as HTMLVideoElement;
+      refused.delete(video);
+      if (video === front) sync();
     };
 
     const observer = new IntersectionObserver(
@@ -194,18 +229,37 @@ export function VisualPanel() {
       { threshold: [0, KEEP_RATIO, VISIBLE_RATIO, 0.6, 1] },
     );
 
-    // The poster gets the pipe first: it is the panel's guarantee, the video
-    // is the enhancement. Assigning src IS the release — the elements ship
-    // without one, so the preload scanner cannot start pulling video the
-    // moment the document parses.
-    const releaseFirst = () => {
-      if (!front.src) load(front, films[0]);
-    };
-    const still = root.querySelector("img");
-    if (!still || still.complete) releaseFirst();
-    else {
-      still.addEventListener("load", releaseFirst, { once: true });
-      still.addEventListener("error", releaseFirst, { once: true });
+    // Assigning src IS the release — the elements ship without one, so the
+    // preload scanner cannot start pulling video the moment the document
+    // parses. It is released at mount, alongside the poster rather than after
+    // it.
+    //
+    // It used to wait for the poster to finish, which on a client-side
+    // arrival — Home to About, where the poster is usually not cached — put a
+    // whole image download in front of the first byte of the film, and the
+    // panel then sat on a still while the reel caught up. The poster does not
+    // need that protection: it is already requested by the document with
+    // fetchpriority="high", and media requests are the lowest priority a
+    // browser has, so the film cannot starve it. On a direct load this also
+    // gives the first film the entire intro to buffer. Only film one — the
+    // standby still waits until film one is actually playing.
+    load(front, films[0]);
+
+    // Where the panel is right now, not after the observer's first delivery a
+    // frame or more from now. On an arrival that already shows the panel, the
+    // play request goes out in this same task. The observer stays the
+    // authority and corrects this on its first record.
+    {
+      const rect = root.getBoundingClientRect();
+      const height =
+        Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+      const width =
+        Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+      onScreen =
+        rect.height > 0 &&
+        height > 0 &&
+        width > 0 &&
+        height / rect.height >= VISIBLE_RATIO;
     }
 
     for (const video of [a, b]) {
@@ -213,10 +267,13 @@ export function VisualPanel() {
       video.addEventListener("loadeddata", onFirstFrame);
       video.addEventListener("loadeddata", onStandbyReady);
       video.addEventListener("playing", onPlaying);
+      video.addEventListener("loadedmetadata", onReadiness);
+      video.addEventListener("canplay", onReadiness);
     }
     document.addEventListener("visibilitychange", sync);
     reducedMotion.addEventListener("change", sync);
     observer.observe(root);
+    sync();
 
     return () => {
       disposed = true;
@@ -228,6 +285,8 @@ export function VisualPanel() {
         video.removeEventListener("loadeddata", onFirstFrame);
         video.removeEventListener("loadeddata", onStandbyReady);
         video.removeEventListener("playing", onPlaying);
+        video.removeEventListener("loadedmetadata", onReadiness);
+        video.removeEventListener("canplay", onReadiness);
         video.pause();
         // Release the decoder and the buffered media, not just the element.
         video.removeAttribute("src");

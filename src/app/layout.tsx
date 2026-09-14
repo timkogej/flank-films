@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { Analytics } from "@/components/Analytics/Analytics";
+import { ConsentBootstrap } from "@/components/Analytics/ConsentBootstrap";
 import { brandFontClassName } from "@/styles/fonts";
 import { site, SITE_ROOT_ID } from "@/lib/site";
 
@@ -8,36 +10,26 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: site.legalName,
+    default: site.title,
     template: `%s — ${site.legalName}`,
   },
   description: site.description,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
     siteName: site.legalName,
-    title: site.legalName,
+    title: site.title,
     description: site.description,
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "FLANK FILMS wordmark",
-      },
-    ],
+    url: "/",
+    images: [site.socialImage],
   },
   twitter: {
     card: "summary_large_image",
-    title: site.legalName,
+    title: site.title,
     description: site.description,
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "FLANK FILMS wordmark",
-      },
-    ],
+    images: [site.socialImage],
   },
 };
 
@@ -80,9 +72,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode; modal: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <ConsentBootstrap />
+      </head>
       <body className={brandFontClassName}>
         <div id={SITE_ROOT_ID}>{children}</div>
         {modal}
+        <Analytics />
       </body>
     </html>
   );

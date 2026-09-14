@@ -7,8 +7,15 @@ import type { Project } from "@/data/projects";
 import {
   afterStills,
   isViewerActive,
+  MOBILE_IDLE_RESET_MS,
+  MOBILE_STALL_MS,
+  MOBILE_STALL_RECOVERIES,
   observePreview,
+  recallPosition,
   refreshPreviews,
+  rememberPosition,
+  reportPlayRefused,
+  saveDataPreferred,
   trackStill,
 } from "./previewScheduler";
 import styles from "./ProjectCard.module.css";
@@ -76,6 +83,7 @@ export function ProjectPreviewMedia({
     const entry = {
       ratio: 0,
       active: false,
+      near: false,
       eligible: !reducedMotion.matches && viewportDriven(),
       order,
       // Only autoplay previews may run behind the intro. A hover preview that
@@ -105,12 +113,29 @@ export function ProjectPreviewMedia({
     // so nothing should be decoding it. Neither one touches wantsVideo(), so
     // neither one moves a pixel — the frame the viewer left is the frame they
     // come back to.
+    //
+    // Unlike wantsVideo(), this does not wait for a decoded frame. Asking only
+    // after `loadeddata` made every start a relay — source, first frame, then
+    // play() — so on an arrival each card began whenever its own decode
+    // happened to finish. Asked as soon as the card is wanted, the browser
+    // starts each loop the moment it can; the still covers the gap, and the
+    // loop becomes the visible layer only once it has a frame.
     const wantsPlay = () =>
-      wantsVideo() &&
+      !disposed &&
+      !reducedMotion.matches &&
+      Boolean(video!.src) &&
+      (entry.active || (hovered && finePointer.matches && entry.ratio > 0)) &&
       document.visibilityState !== "hidden" &&
       !isViewerActive();
 
+    let pointerPending = false; // a play() promise is outstanding
+    let pointerRefused = false; // retried only when the element reports progress
+
     function sync() {
+      if (!finePointer.matches) {
+        syncTouch();
+        return;
+      }
       const play = wantsPlay();
       video!.classList.toggle(styles.videoShown, wantsVideo());
 
@@ -119,7 +144,11 @@ export function ProjectPreviewMedia({
         // Fetch in full only once this card is actually wanted. On a phone
         // that keeps the intro from pulling every preview at once.
         if (video!.preload !== "auto") video!.preload = "auto";
-        if (video!.paused) {
+        if (video!.paused && !pointerPending && !pointerRefused) {
+          // Stated on the element at the moment of asking, as on touch.
+          video!.muted = true;
+          video!.playsInline = true;
+          pointerPending = true;
           const started = video!.play();
           // Muted playback normally resolves, but Safari can still refuse.
           // Re-check afterwards: a fast pointer can leave before this settles,
@@ -127,15 +156,26 @@ export function ProjectPreviewMedia({
           if (started) {
             started
               .then(() => {
+                pointerPending = false;
                 if (!wantsPlay()) video!.pause();
               })
-              .catch(() => {
-                /* autoplay refused or interrupted by pause() — nothing to do */
+              .catch((error: unknown) => {
+                pointerPending = false;
+                // Interrupted by our own pause(): newer intent, not a failure.
+                if (error instanceof DOMException && error.name === "AbortError") {
+                  return;
+                }
+                // Asked again by the readiness events below — never a timer.
+                if (wantsPlay()) pointerRefused = true;
               });
+          } else {
+            pointerPending = false;
           }
         }
         return;
       }
+
+      pointerRefused = false;
 
       if (!video!.paused) video!.pause();
       // Rewind only after the still has finished fading back over the top, so
@@ -148,8 +188,194 @@ export function ProjectPreviewMedia({
       }, FADE_MS);
     }
 
+    /* ---------------------------------------------------------- touch */
+
+    // Without hover the card follows the scheduler's active set alone, and a
+    // pause is only a pause: the loop keeps its place and its frame. Three
+    // things differ from the pointer path above, each for a measured reason:
+    //
+    //  - play() is not gated on `loadeddata`. WebKit decodes no first frame
+    //    for preload="metadata" until playback is asked for, so waiting for
+    //    one first left every phone preview stuck at readyState 1.
+    //  - the loop becomes the visible layer once frames are actually
+    //    advancing, not when play() was requested — a buffering start keeps
+    //    the still, and never flashes an empty element.
+    //  - nothing rewinds until the card has been out of the set for
+    //    MOBILE_IDLE_RESET_MS.
+    let rendering = false; // an advancing frame has reached the video layer
+    let playPending = false; // a play() promise is outstanding
+    let playFailed = false; // the last play() was refused while wanted
+    let idleTimer = 0;
+    let stallTimer = 0;
+    let stallBuffered = 0; // buffered seconds when the stall timer was armed
+    let recoveries = 0;
+    let playToken = 0; // only the latest play() may settle the flags
+    let frameProbe = -1; // currentTime when playback was last requested
+    let resumeAt = src ? recallPosition(src) : 0;
+
+    const touchWantsPlay = () =>
+      !disposed &&
+      entry.active &&
+      entry.eligible &&
+      document.visibilityState !== "hidden" &&
+      !isViewerActive();
+
+    const bufferedEnd = () => {
+      const ranges = video!.buffered;
+      return ranges.length ? ranges.end(ranges.length - 1) : 0;
+    };
+
+    function clearStall() {
+      window.clearTimeout(stallTimer);
+      stallTimer = 0;
+    }
+
+    function armStall() {
+      clearStall();
+      stallBuffered = bufferedEnd();
+      stallTimer = window.setTimeout(onStall, MOBILE_STALL_MS);
+    }
+
+    // One timer per start, not a poll: it only re-arms while bytes are still
+    // arriving (a slow start, keep waiting) and gives up after a bounded
+    // number of reloads (the still stays, which is always a valid card).
+    function onStall() {
+      stallTimer = 0;
+      if (!touchWantsPlay() || video!.currentTime !== frameProbe) return;
+      if (bufferedEnd() > stallBuffered) {
+        armStall();
+        return;
+      }
+      if (recoveries >= MOBILE_STALL_RECOVERIES) return;
+      recoveries += 1;
+      resumeAt = video!.currentTime || resumeAt;
+      rendering = false;
+      video!.classList.remove(styles.videoShown);
+      playToken += 1; // the aborted request must not touch the new one
+      playPending = false;
+      video!.load();
+      requestPlay();
+    }
+
+    function markRendering() {
+      if (disposed || video!.paused || video!.readyState < 2) return;
+      if (video!.currentTime === frameProbe) return;
+      clearStall();
+      recoveries = 0;
+      if (rendering) return;
+      rendering = true;
+      syncTouch();
+    }
+
+    function requestPlay() {
+      // `paused` turns false synchronously inside play(), so this is also the
+      // guard against a second request while the first is settling.
+      if (!video!.paused || playPending || !video!.src) return;
+      // Silent and inline are what make the request legal on iOS; state them
+      // on the element at the moment of asking rather than trusting markup.
+      video!.muted = true;
+      video!.defaultMuted = true;
+      video!.playsInline = true;
+      frameProbe = video!.currentTime;
+      playPending = true;
+      playFailed = false;
+      const token = ++playToken;
+      armStall();
+      video!
+        .play()
+        .then(() => {
+          if (token !== playToken) return;
+          playPending = false;
+          if (!touchWantsPlay()) video!.pause();
+          else video!.requestVideoFrameCallback?.(() => markRendering());
+        })
+        .catch((error: unknown) => {
+          if (token !== playToken) return;
+          playPending = false;
+          // Superseded by our own pause(): newer intent won, nothing failed.
+          if (!touchWantsPlay()) return;
+          // Retried by the readiness events below, or re-sync; never a timer.
+          playFailed = true;
+          // Only a gesture can change this answer.
+          if (error instanceof DOMException && error.name === "NotAllowedError") {
+            reportPlayRefused();
+          }
+        });
+    }
+
+    function idleReset() {
+      idleTimer = 0;
+      if (disposed || entry.active) return;
+      rendering = false;
+      video!.classList.remove(styles.videoShown);
+      // Rewind under the still, once it has faded back over the top.
+      idleTimer = window.setTimeout(() => {
+        idleTimer = 0;
+        if (!disposed && !entry.active && video!.currentTime !== 0) {
+          video!.currentTime = 0;
+        }
+      }, FADE_MS);
+    }
+
+    function syncTouch() {
+      // Buffer ahead for the cards that are about to matter, and only those.
+      const buffer =
+        entry.eligible &&
+        (entry.active || (entry.near && !saveDataPreferred()));
+      if (buffer && video!.src && video!.preload !== "auto") {
+        video!.preload = "auto";
+      }
+
+      if (entry.active) {
+        window.clearTimeout(idleTimer);
+        idleTimer = 0;
+      } else if (!idleTimer && (rendering || video!.currentTime > 0)) {
+        idleTimer = window.setTimeout(idleReset, MOBILE_IDLE_RESET_MS);
+      }
+
+      // A paused loop keeps showing the frame it stopped on. Only reduced
+      // motion and the idle reset hand the card back to its still.
+      video!.classList.toggle(
+        styles.videoShown,
+        rendering && !reducedMotion.matches,
+      );
+
+      if (touchWantsPlay()) {
+        requestPlay();
+      } else {
+        clearStall();
+        if (!video!.paused) video!.pause();
+      }
+    }
+
+    // Event-driven retry: a refused or premature play() is asked again when
+    // the element reports it can now do more than when it was last asked.
+    const onReadiness = () => {
+      if (finePointer.matches) {
+        if (!pointerRefused) return;
+        pointerRefused = false;
+        sync();
+        return;
+      }
+      if (!playFailed) return;
+      if (touchWantsPlay()) requestPlay();
+    };
+    const onLoadedMetadata = () => {
+      // Continue where this preview was before the homepage unmounted.
+      if (resumeAt > 0 && video.currentTime === 0 && resumeAt < video.duration) {
+        video.currentTime = resumeAt;
+      }
+      resumeAt = 0;
+      onReadiness();
+    };
+    const onTimeUpdate = () => {
+      if (!finePointer.matches) markRendering();
+    };
+
     const onLoadedData = () => {
       ready = true;
+      if (finePointer.matches) pointerRefused = false;
+      else onReadiness();
       sync();
     };
     const onEnter = () => {
@@ -194,12 +420,18 @@ export function ProjectPreviewMedia({
       video.preload =
         previewMode === "autoplay" && finePointer.matches ? "auto" : "metadata";
       video.src = src;
+      // The card may already be in the active set, waiting only for bytes:
+      // ask for playback in the same task as the source.
+      sync();
     };
     const still = root.querySelector("img");
     const untrackStill = still ? trackStill(still) : () => {};
     const cancelRelease = afterStills(releaseVideo);
 
     video.addEventListener("loadeddata", onLoadedData);
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    video.addEventListener("canplay", onReadiness);
+    video.addEventListener("timeupdate", onTimeUpdate);
     document.addEventListener("visibilitychange", sync);
     reducedMotion.addEventListener("change", onCapabilityChange);
     finePointer.addEventListener("change", onCapabilityChange);
@@ -213,8 +445,16 @@ export function ProjectPreviewMedia({
     return () => {
       disposed = true;
       window.clearTimeout(resetTimer);
+      window.clearTimeout(idleTimer);
+      clearStall();
+      if (src && rendering && video.currentTime > 0) {
+        rememberPosition(src, video.currentTime);
+      }
       unobserve();
       video.removeEventListener("loadeddata", onLoadedData);
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("canplay", onReadiness);
+      video.removeEventListener("timeupdate", onTimeUpdate);
       document.removeEventListener("visibilitychange", sync);
       reducedMotion.removeEventListener("change", onCapabilityChange);
       finePointer.removeEventListener("change", onCapabilityChange);
