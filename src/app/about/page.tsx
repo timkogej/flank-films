@@ -53,7 +53,9 @@ export default function AboutPage() {
     <>
       <StructuredData page="about" />
       <DarkLightIntro>
-        <div className={styles.shell}>
+        {/* The homepage's framed shell, on a neutral ground: same inset, gaps
+            and radii via the framed tokens in globals.css — no film. */}
+        <div className={styles.shell} data-framed-shell="neutral">
           <Header current="about" />
           <main className={styles.main}>
             <AboutPanel />

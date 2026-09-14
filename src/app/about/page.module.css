@@ -1,6 +1,12 @@
 /* About + Contact. Scrolls normally — unlike the desktop homepage, this page
-   is not pinned to one viewport. */
+   is not pinned to one viewport.
+
+   The same framed architecture as Home — header panel, 6px, content panel,
+   6px, visual panels — on a calm neutral ground instead of a film. The
+   ground is painted here as well as on <body>, because the intro's riser
+   (which holds this shell) is opaque white. */
 .shell {
+  background: var(--shell-ground);
   display: flex;
   flex-direction: column;
   gap: var(--header-gap);
@@ -12,9 +18,14 @@
 }
 
 .main {
+  /* The panels are the page's outer frames here, not cards inside a frame,
+     so their outer corners take the frame's radius — the header's curve.
+     Only each panel's outermost box reads this token. */
+  --card-radius: var(--frame-radius);
+
   display: flex;
   flex-direction: column;
-  gap: var(--media-gap);
+  gap: var(--header-gap);
   flex: 1 1 auto;
   min-height: 0;
 }

@@ -30,6 +30,10 @@
   /* HomeBackdrop's tone before any pixel of the film has arrived: the average
      of the Ljubljana Pingo cut, so the load is a sharpening, not a flash. */
   --backdrop-fallback: #9a8c7a;
+  /* The calm ground behind framed pages that have no film behind them
+     (About): a neutral light grey, just dark enough to draw the white
+     panels' edges and corners. */
+  --shell-ground: #ebebeb;
 
   /* Typography — calibrated for Helvetica Now proportions.
      Licensed font files are not present; see src/styles/fonts.ts. */
@@ -88,6 +92,12 @@
 :root:has([data-framed-shell]) {
   /* The header panel shares the content frame's curve. */
   --header-radius: var(--frame-radius);
+}
+
+/* The neutral variant (About): the same ground under the page too, so an
+   overscroll or a short viewport never shows a white edge. */
+body:has([data-framed-shell="neutral"]) {
+  background: var(--shell-ground);
 }
 
 /* A touch more film around the wide composition. Tablet (8px) and phone
