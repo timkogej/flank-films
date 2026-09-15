@@ -120,8 +120,14 @@ export function HomeBackdrop() {
           this component again after mount, so it never overwrites them. */}
       {[0, 1].map((index) => (
         <div key={index} className={styles.layer} data-layer>
+          {/* Still first, film second, and the stylesheet stacks them the same
+              way: the film is ALWAYS painted above its still. (With the order
+              reversed, a layer's still covered its own playing film — a frozen
+              frame, or another project's still over the right film.) */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- a card poster at viewport size; filled in by the controller. */}
+          <img className={`${styles.media} ${styles.still}`} alt="" decoding="async" />
           <video
-            className={styles.media}
+            className={`${styles.media} ${styles.film}`}
             muted
             loop
             playsInline
@@ -130,8 +136,6 @@ export function HomeBackdrop() {
             disablePictureInPicture
             disableRemotePlayback
           />
-          {/* eslint-disable-next-line @next/next/no-img-element -- a card poster at viewport size; filled in by the controller. */}
-          <img className={styles.media} alt="" decoding="async" />
         </div>
       ))}
     </div>

@@ -1,39 +1,46 @@
 import type { ProjectBackdrop } from "@/data/projects";
 
 /**
- * The homepage backdrop's one piece of logic: which media is on screen, and
- * how the next one gets there.
+ * The homepage backdrop's one piece of logic: which project is behind the
+ * framed site, and how the next one gets there.
  *
- * Two reusable layers, never more. One is FRONT (fully visible, the only one
- * allowed to be advancing at rest); the other is the STANDBY, which is where
- * the next media is prepared, invisibly, on top. Only once it can show a real
- * frame does it fade in over the front — which stays at full opacity beneath,
- * so the crossfade has no luminance dip — and then the old front is paused and
- * becomes the standby. It keeps its source, so going straight back to it is
- * instant: no refetch, no restart.
+ * ONE AUTHORITY. `desired` is the project the input asked for (hover, the
+ * dominant card while scrolling, the viewer closing, the default). Every
+ * decision resolves against it, and nothing else can put a picture on screen.
  *
- *   idle        nothing on the layers yet; the static poster underneath shows
- *   loading     the standby is preparing `target` (its still takes over if
- *               the video is slow — see POSTER_GRACE_MS)
- *   crossfading the standby is fading in; never interrupted
- *   active      front shows `target`
+ * TWO LAYERS, EACH WITH AN IDENTITY. A layer holds exactly one project at a
+ * time (`media`) and a generation number (`gen`) that changes every time it is
+ * given a project. Its still is always THAT project's still and its film always
+ * THAT project's film, so a layer can never show one project's picture under
+ * another's name. Every asynchronous continuation — an image decode, a media
+ * event, a frame callback, a timer — carries the generation it was started for
+ * and is a complete no-op if the layer has moved on or no longer owns
+ * `desired`. A late event from an old source cannot surface.
  *
- * The latest target always wins. A load is identified by a token and every
- * async continuation checks it, so a slow video that was asked for three
- * hovers ago can never surface. A crossfade is never cut short: a newer target
- * is reconciled the moment it lands, which is at most one fade away.
+ *   front     the visible layer (opaque)
+ *   incoming  the other layer, preparing `desired` invisibly on top, then
+ *             fading in over the front — which stays opaque underneath, so
+ *             there is no luminance dip — and becoming the front
  *
- * Two questions are kept apart on purpose:
+ * WHAT A LAYER SHOWS is one value, `show`:
  *
- *   WHEN to crossfade   decided by the load's own readiness promise and token
- *   WHETHER a film is   decided by the element itself (see onVideoProgress):
- *   visible in its      a layer's own film that is playing with a moving clock
- *   layer               is shown, whichever load, retry or resume started it
+ *   none   nothing yet
+ *   still  its project's still
+ *   film   its project's film, over its still — set only from the element's
+ *          own frame signals (a presented frame where the engine reports one,
+ *          otherwise playing with a decoded frame), and only while the layer
+ *          owns `desired`
  *
- * They used to be one promise. Any film that started outside it — after a
- * superseded load, a return to the same card while another loaded, or an
- * autoplay refusal retried by a gesture — played on, decoding, behind its own
- * still, and never appeared.
+ * TIMING. Nothing waits that does not have to:
+ *   desktop  hover intent (ENTER_INTENT_MS), then the target is prepared at
+ *            once. If its film presents a frame within STILL_AFTER_MS it fades
+ *            straight in; otherwise its own still fades in and the film follows
+ *            over it the moment it is ready.
+ *   scroll   the still at once; the film only after LINGER_MS on the card.
+ *
+ * PLAYBACK is decided in one place (syncPlayback) and defended: a film the
+ * controller wants playing that the browser pauses is asked again, and a start
+ * that stalls is reloaded where it was. A frozen front frame cannot persist.
  *
  * Plain TypeScript and no React state: hover moves nothing in the React tree.
  */
@@ -41,8 +48,7 @@ import type { ProjectBackdrop } from "@/data/projects";
 export const BACKDROP_FADE_MS = 360;
 
 /** A pointer must rest on a card this long before its media is asked for — a
- *  sweep across the mosaic passes through cards faster than this and fetches
- *  nothing on the way. */
+ *  sweep across the mosaic passes through cards faster than this. */
 const ENTER_INTENT_MS = 120;
 
 /** Leaving a card waits this long before returning to the default, so
@@ -50,15 +56,20 @@ const ENTER_INTENT_MS = 120;
  *  project. */
 const LEAVE_INTENT_MS = 160;
 
-/** How long the outgoing media is held while an incoming video prepares.
- *  Cached and nearby files are presenting well inside this; past it the
- *  network is slow, and the incoming project's still takes over. */
-const POSTER_GRACE_MS = 700;
+/** Desktop: the outgoing picture is held this long for the incoming film.
+ *  A cached or nearby film presents well inside it and crossfades straight
+ *  in; past it, the incoming project's own still stands in immediately. */
+const STILL_AFTER_MS = 160;
 
 /** Scroll mode: how long a card must keep the backdrop before its film is
- *  loaded over its still. Scrolling through the page costs no video at all;
- *  staying with a piece of work brings it to life. */
+ *  loaded over its still. Scrolling through the work costs no video. */
 const LINGER_MS = 1000;
+
+/** A wanted film that has neither advanced nor received a single byte for
+ *  this long is reloaded where it was — WebKit can otherwise hold a start
+ *  indefinitely. A download that is merely slow is never restarted. */
+const STALL_MS = 3000;
+const STALL_RELOADS = 2;
 
 /**
  * Which input is allowed to choose the backdrop. Exactly one, from device
@@ -81,38 +92,51 @@ export interface BackdropLayer {
   image: HTMLImageElement;
 }
 
-type Phase = "idle" | "loading" | "crossfading" | "active";
+type Show = "none" | "still" | "film";
 type Role = "front" | "standby" | "incoming" | "fading";
 
-interface LayerState extends BackdropLayer {
-  /** What the layer's elements currently hold — kept after it goes standby. */
+interface Layer extends BackdropLayer {
+  /** The project this layer holds. Its identity; null when released. */
   media: ProjectBackdrop | null;
-  kind: "video" | "image" | null;
-  /** The video file this layer has actually presented frames of. Only that
-   *  one is worth keeping loaded while the layer waits in standby. */
-  presented: string | null;
-  /** Showing a still whose film is waiting for the visitor to linger. */
+  /** Changes on every assignment; async work carries the value it began with. */
+  gen: number;
+  show: Show;
+  /** Its film should be loading/playing (false for stills and while lingering). */
+  filmWanted: boolean;
+  /** Showing its still while its film waits for the visitor to linger. */
   lingering: boolean;
+  stillReady: boolean;
+  stillDue: boolean;
+  /** A film file this layer has presented frames of: kept loaded in standby,
+   *  so returning to it is instant. */
+  presented: string | null;
+  stallTimer: number;
+  stallReloads: number;
+  stillTimer: number;
+  lingerTimer: number;
+  frameRequested: number;
+  /** When the element last reported bytes arriving (`progress`). */
+  progressAt: number;
+  /** When a browser-initiated pause was last answered — at most once a second,
+   *  so a browser that insists cannot become a play/pause loop. */
+  resumedAt: number;
 }
 
 export class HomeBackdropController {
-  private layers: [LayerState, LayerState] | null = null;
-  private front = -1;
-  private phase: Phase = "idle";
-  private target: ProjectBackdrop | null = null;
-  private token = 0;
-  private abort: AbortController | null = null;
-  /** The per-layer element listeners, for the life of one attach. */
-  private lifetime: AbortController | null = null;
+  private layers: [Layer, Layer] | null = null;
+  private front: Layer | null = null;
+  private incoming: Layer | null = null;
+  private fading = false;
   private fadeTimer = 0;
-  private enterTimer = 0;
-  private graceTimer = 0;
-  private leaveTimer = 0;
-  private lingerTimer = 0;
-  /** The current target arrived by scrolling: show its still first. */
+
+  /** The one authority. Null until the default is released. */
+  private desired: ProjectBackdrop | null = null;
+  /** `desired` arrived by scrolling: its still comes first, its film lingers. */
   private stillFirst = false;
-  /** A key whose last load failed; not retried until the target changes. */
-  private failedKey: string | null = null;
+
+  private enterTimer = 0;
+  private leaveTimer = 0;
+  private lifetime: AbortController | null = null;
   private suspended = { hidden: false, viewer: false };
   private videoAllowed = false;
   private currentMode: BackdropMode = "static";
@@ -123,54 +147,79 @@ export class HomeBackdropController {
 
   /* ------------------------------------------------------------- lifecycle */
 
-  attach(
-    layers: [BackdropLayer, BackdropLayer],
-    capabilities: BackdropCapabilities,
-  ): void {
+  attach(layers: [BackdropLayer, BackdropLayer], capabilities: BackdropCapabilities): void {
+    this.lifetime?.abort();
+    const lifetime = new AbortController();
+    this.lifetime = lifetime;
     this.layers = layers.map((layer) => ({
       ...layer,
       media: null,
-      kind: null,
-      presented: null,
+      gen: 0,
+      show: "none",
+      filmWanted: false,
       lingering: false,
-    })) as [LayerState, LayerState];
-    this.front = -1;
-    this.phase = "idle";
+      stillReady: false,
+      stillDue: false,
+      presented: null,
+      stallTimer: 0,
+      stallReloads: 0,
+      stillTimer: 0,
+      lingerTimer: 0,
+      frameRequested: -1,
+      resumedAt: 0,
+      progressAt: 0,
+    })) as [Layer, Layer];
+    this.front = null;
+    this.incoming = null;
+    this.fading = false;
     this.setCapabilities(capabilities);
-    this.lifetime?.abort();
-    this.lifetime = new AbortController();
+
     for (const layer of this.layers) {
       this.setRole(layer, "standby");
-      const onProgress = () => this.onVideoProgress(layer);
-      layer.video.addEventListener("timeupdate", onProgress, {
-        signal: this.lifetime.signal,
+      this.render(layer);
+      const { video } = layer;
+      const on = (type: string, handler: () => void) =>
+        video.addEventListener(type, handler, { signal: lifetime.signal });
+      // Frame signals: a film is revealed from what the element reports, never
+      // from a load's bookkeeping.
+      for (const type of ["loadeddata", "canplay", "playing"]) {
+        on(type, () => this.onFilmSignal(layer));
+      }
+      // A clock that moves after a stall clears the stall.
+      on("timeupdate", () => this.clearStall(layer));
+      on("progress", () => {
+        layer.progressAt = performance.now();
       });
+      on("waiting", () => this.armStall(layer));
+      on("stalled", () => this.armStall(layer));
+      on("pause", () => this.onBrowserPause(layer));
     }
   }
 
   detach(): void {
     this.lifetime?.abort();
     this.lifetime = null;
-    this.cancelLoad();
     window.clearTimeout(this.fadeTimer);
-    window.clearTimeout(this.enterTimer);
-    window.clearTimeout(this.leaveTimer);
-    window.clearTimeout(this.graceTimer);
-    window.clearTimeout(this.lingerTimer);
+    this.clearIntent();
     window.removeEventListener("pointerup", this.retryOnGesture);
-    for (const layer of this.layers ?? []) layer.video.pause();
+    for (const layer of this.layers ?? []) {
+      this.clearLayerTimers(layer);
+      layer.gen++;
+      this.pauseVideo(layer);
+    }
     this.layers = null;
-    this.target = null;
-    this.phase = "idle";
-    this.front = -1;
+    this.front = null;
+    this.incoming = null;
+    this.fading = false;
+    this.desired = null;
   }
 
-  /** The default source may start (the mosaic's stills have landed). */
+  /** The default may start (the mosaic's stills have landed). */
   start(): void {
-    if (!this.layers || this.target) return;
+    if (!this.layers || this.desired) return;
     this.stillFirst = false;
-    this.target = this.fallback ?? null;
-    this.reconcile();
+    this.desired = this.fallback ?? null;
+    this.evaluate();
   }
 
   setCapabilities(next: BackdropCapabilities): void {
@@ -180,7 +229,7 @@ export class HomeBackdropController {
       // old input survives into the new one.
       this.currentMode = next.mode;
       this.clearIntent();
-      this.setTarget(this.fallback ?? null);
+      this.setDesired(this.fallback ?? null, false);
       for (const listener of this.modeListeners) listener(next.mode);
     }
     this.syncPlayback();
@@ -201,62 +250,50 @@ export class HomeBackdropController {
   setSuspended(reason: "hidden" | "viewer", on: boolean): void {
     if (this.suspended[reason] === on) return;
     this.suspended[reason] = on;
-    if (!on) this.failedKey = null;
     this.syncPlayback();
-    if (!on) this.reconcile();
+    if (!on) this.evaluate();
   }
 
-  /* ----------------------------------------------------------------- hover */
+  /* ---------------------------------------------------------------- inputs */
 
   /** A card asked for its media. Ignored where hover is not a real input. */
   hover(media: ProjectBackdrop): void {
     if (this.currentMode !== "hover" || !this.layers) return;
-    window.clearTimeout(this.leaveTimer);
-    window.clearTimeout(this.enterTimer);
-    this.enterTimer = window.setTimeout(() => {
-      this.stillFirst = false;
-      this.setTarget(media);
-    }, ENTER_INTENT_MS);
+    this.clearIntent();
+    this.enterTimer = window.setTimeout(
+      () => this.setDesired(media, false),
+      ENTER_INTENT_MS,
+    );
   }
 
   /** The card was left. Resolved to the default unless another card is
    *  entered first. */
   leave(): void {
     if (this.currentMode !== "hover" || !this.layers) return;
-    window.clearTimeout(this.enterTimer);
-    window.clearTimeout(this.leaveTimer);
-    this.leaveTimer = window.setTimeout(() => {
-      this.stillFirst = false;
-      this.setTarget(this.fallback ?? null);
-    }, LEAVE_INTENT_MS);
+    this.clearIntent();
+    this.leaveTimer = window.setTimeout(
+      () => this.setDesired(this.fallback ?? null, false),
+      LEAVE_INTENT_MS,
+    );
   }
 
-  /* ---------------------------------------------------------------- scroll */
-
   /**
-   * The dominant card while scrolling. No intent delay here: the selector has
-   * already waited for the choice to be stable, and owns the hysteresis.
-   *
-   * Still first: the card's poster — already loaded by the card itself —
-   * crossfades in at once, and its film follows only after LINGER_MS. On a
-   * phone that keeps a scroll through the work free of backdrop downloads and
-   * decoding (WebKit refetches a file on every source change), and leaves the
-   * device's video budget to the previews while the visitor is moving.
+   * The dominant card while scrolling. The selector has already waited for the
+   * choice to be stable and owns the hysteresis. Still first, film on linger.
    */
   select(media: ProjectBackdrop): void {
     if (this.currentMode !== "scroll" || !this.layers) return;
-    this.stillFirst = true;
-    this.setTarget(media);
+    this.setDesired(media, true);
   }
 
-  /** Straight to a target with no intent delay — used when the page state,
-   *  not the input, decides (the viewer closing). `null` is the default. */
+  /** Straight to a target with no intent delay — the page state decides (the
+   *  viewer closing). `null` is the default. */
   resolve(media: ProjectBackdrop | null): void {
     if (!this.layers) return;
     this.clearIntent();
-    this.stillFirst = this.currentMode === "scroll";
-    this.setTarget(
+    this.setDesired(
       media && this.currentMode !== "static" ? media : (this.fallback ?? null),
+      this.currentMode === "scroll",
     );
   }
 
@@ -267,331 +304,387 @@ export class HomeBackdropController {
 
   /* ---------------------------------------------------------- the machine */
 
-  private setTarget(media: ProjectBackdrop | null): void {
-    if (!this.target) return; // not started: the default has not been released
-    if (!media || media.key === this.target.key) return;
-    this.target = media;
-    this.failedKey = null;
-    this.reconcile();
+  private setDesired(media: ProjectBackdrop | null, stillFirst: boolean): void {
+    if (!this.desired || !media) return; // not started yet
+    if (media.key === this.desired.key) return;
+    this.desired = media;
+    this.stillFirst = stillFirst;
+    this.evaluate();
   }
 
-  private reconcile(): void {
-    const layers = this.layers;
-    const target = this.target;
-    if (!layers || !target) return;
-    if (this.phase === "crossfading") return; // picked up when the fade lands
-    if (this.suspended.viewer || this.suspended.hidden) return;
+  /** Does this layer hold the project the input currently wants? */
+  private owns(layer: Layer | null): layer is Layer {
+    return Boolean(layer?.media && this.desired && layer.media.key === this.desired.key);
+  }
 
-    const front = this.front >= 0 ? layers[this.front] : null;
-    if (front?.media?.key === target.key) {
-      // Already showing it: nothing restarts, nothing fades.
-      if (this.phase === "loading") this.cancelLoad();
-      this.phase = "active";
-      this.armLinger();
+  /** Bring the layers towards `desired`. Safe to call at any time. */
+  private evaluate(): void {
+    const layers = this.layers;
+    const desired = this.desired;
+    if (!layers || !desired) return;
+    if (this.suspended.hidden || this.suspended.viewer || this.fading) {
+      // A fade always lands; suspension resumes here.
+      this.syncPlayback();
       return;
     }
-    if (target.key === this.failedKey) return;
-    const standby = layers[this.standbyIndex()];
-    if (this.phase === "loading" && standby.media?.key === target.key) return;
 
-    this.load(target);
+    if (this.owns(this.front)) {
+      // Already showing it: nothing restarts and nothing fades. Anything that
+      // was being prepared for another project is abandoned.
+      if (this.incoming) this.abandon(this.incoming);
+      this.incoming = null;
+      this.armLinger(this.front);
+      this.syncPlayback();
+      return;
+    }
+
+    if (this.owns(this.incoming)) {
+      this.syncPlayback();
+      this.maybeFade(this.incoming);
+      return;
+    }
+
+    const layer = this.incoming ?? (this.front === layers[0] ? layers[1] : layers[0]);
+    this.assign(layer, desired);
   }
 
-  private standbyIndex(): number {
-    return this.front === 0 ? 1 : 0;
-  }
-
-  private load(media: ProjectBackdrop): void {
-    const layers = this.layers!;
-    this.cancelLoad();
-    const token = ++this.token;
-    const abort = new AbortController();
-    this.abort = abort;
-    const index = this.standbyIndex();
-    const layer = layers[index];
-    window.clearTimeout(this.lingerTimer);
-    this.phase = "loading";
-    this.setRole(layer, "incoming");
-    this.setVideoShown(layer, false);
-
-    // A film this layer has already presented is ready now: no still needed.
+  /** Give a layer a project. Everything it held before is invalidated. */
+  private assign(layer: Layer, media: ProjectBackdrop): void {
+    this.clearLayerTimers(layer);
+    const gen = ++layer.gen;
     const reusable =
       Boolean(media.video) &&
       layer.presented === media.video &&
       layer.video.getAttribute("src") === media.video;
+
     layer.media = media;
-    layer.lingering = false;
+    layer.stillReady = false;
+    layer.stillDue = false;
+    layer.stallReloads = 0;
+    this.incoming = layer;
+    this.setRole(layer, "incoming");
+    this.setShow(layer, "none");
 
-    const failed = () => {
-      this.failedKey = media.key;
-      this.phase = this.front >= 0 ? "active" : "idle";
-      this.setRole(layer, "standby");
-    };
-
-    const stillFirst =
-      this.stillFirst && Boolean(media.video) && this.videoAllowed && !reusable;
-    if (!media.video || !this.videoAllowed || (stillFirst && media.image)) {
-      layer.kind = layer.root.dataset.kind = "image";
-      layer.lingering = stillFirst;
-      this.releaseUnpresented(layer);
-      this.decodeImage(layer, media).then((ok) => {
-        if (token !== this.token) return; // superseded: never surfaces
-        if (ok) this.crossfade(index);
-        else failed();
-      });
-      return;
+    // Its own still, always — the only still that may ever sit in this layer.
+    layer.image.style.objectPosition = media.position;
+    if (media.image) {
+      if (layer.image.getAttribute("src") !== media.image) layer.image.src = media.image;
+      layer.image
+        .decode()
+        .catch(() => undefined)
+        .then(() => {
+          if (layer.gen !== gen || layer.image.getAttribute("src") !== media.image) return;
+          if (!layer.image.complete || layer.image.naturalWidth === 0) return;
+          layer.stillReady = true;
+          this.tryStill(layer, gen);
+        });
+    } else {
+      layer.image.removeAttribute("src");
     }
 
-    layer.kind = layer.root.dataset.kind = "video";
-    let onPoster = false;
-
-    // Continuity first: the outgoing media stays up while the incoming video
-    // prepares. Only when that is slow does the incoming still take over — so
-    // a slow network shows the right project rather than a stale one — and
-    // the video then fades in over its own still inside the same layer.
-    window.clearTimeout(this.graceTimer);
-    this.graceTimer = window.setTimeout(() => {
-      this.decodeImage(layer, media).then((ok) => {
-        if (!ok || token !== this.token || this.phase !== "loading") return;
-        onPoster = true;
-        this.crossfade(index);
-      });
-    }, POSTER_GRACE_MS);
-
-    this.prepareVideo(layer, media, abort.signal).then((ok) => {
-      window.clearTimeout(this.graceTimer);
-      if (token !== this.token) return;
-      if (!ok) {
-        if (!onPoster) failed();
-        return;
+    // Its own film.
+    const film = Boolean(media.video) && this.videoAllowed;
+    layer.lingering = film && this.stillFirst && !reusable && Boolean(media.image);
+    layer.filmWanted = film && !layer.lingering;
+    if (layer.filmWanted) {
+      layer.video.style.objectPosition = media.position;
+      if (layer.video.getAttribute("src") !== media.video) {
+        layer.video.preload = "auto";
+        layer.video.src = media.video!;
       }
-      layer.presented = media.video!;
-      this.setVideoShown(layer, true);
-      if (!onPoster) this.crossfade(index);
-    });
+    } else {
+      this.release(layer);
+    }
+
+    // When may its still stand in? Stills and lingering films: at once.
+    // Films: after the short hold, if no frame has come by then.
+    const hold = layer.filmWanted ? STILL_AFTER_MS : 0;
+    layer.stillTimer = window.setTimeout(() => {
+      if (layer.gen !== gen) return;
+      layer.stillDue = true;
+      this.tryStill(layer, gen);
+    }, hold);
+
+    this.syncPlayback();
+    if (layer.filmWanted) this.onFilmSignal(layer);
+  }
+
+  /** A layer's still may now be what it shows. */
+  private tryStill(layer: Layer, gen: number): void {
+    if (layer.gen !== gen || !this.owns(layer)) return;
+    if (!layer.stillReady || !layer.stillDue || layer.show !== "none") return;
+    this.setShow(layer, "still");
+    if (layer === this.front) this.armLinger(layer);
+    this.maybeFade(layer);
   }
 
   /**
-   * The one authority on a film's visibility inside its layer.
-   *
-   * `timeupdate` only fires while the clock moves, so together with a decoded
-   * frame and a playing element it is proof there is a real, advancing picture
-   * — never a black or empty element. Only the layer's own current film
-   * counts: a stale source still in the element after a switch is ignored.
-   * Revealing an invisible (incoming) layer is instant and harmless; on a
-   * visible layer showing its still, the film fades in over the still.
+   * The film authority. Called on the element's own signals; a film is shown
+   * only when it is this layer's current file, the layer owns `desired`, and
+   * the element is playing with a decoded frame. Where the engine can report a
+   * presented frame, that is waited for too.
    */
-  private onVideoProgress(layer: LayerState): void {
-    const video = layer.video;
-    const src = video.getAttribute("src");
-    if (!src || layer.kind !== "video" || layer.media?.video !== src) return;
+  private onFilmSignal(layer: Layer): void {
+    const { video, media } = layer;
+    const gen = layer.gen;
+    if (!media?.video || !layer.filmWanted || video.getAttribute("src") !== media.video) return;
+    if (!this.owns(layer) || (layer !== this.front && layer !== this.incoming)) return;
     if (video.paused || video.readyState < 2) return;
-    layer.presented = src;
-    if (layer.root.dataset.video !== "shown") this.setVideoShown(layer, true);
+
+    const reveal = () => {
+      if (layer.gen !== gen || !this.owns(layer) || !layer.filmWanted) return;
+      if (video.getAttribute("src") !== media.video || video.readyState < 2) return;
+      layer.presented = media.video!;
+      this.clearStall(layer);
+      if (layer.show !== "film") this.setShow(layer, "film");
+      this.maybeFade(layer);
+    };
+
+    if (typeof video.requestVideoFrameCallback === "function") {
+      if (layer.frameRequested === gen) return; // one frame request per assignment
+      layer.frameRequested = gen;
+      video.requestVideoFrameCallback(() => {
+        if (layer.frameRequested === gen) layer.frameRequested = -1;
+        reveal();
+      });
+    } else {
+      reveal();
+    }
+  }
+
+  /** Fade the incoming layer in once it has something of its own to show. */
+  private maybeFade(layer: Layer): void {
+    if (layer !== this.incoming || this.fading || !this.owns(layer)) return;
+    if (layer.show === "none") return;
+    if (this.suspended.hidden || this.suspended.viewer) return;
+
+    const outgoing = this.front;
+    const gen = layer.gen;
+    this.fading = true;
+    this.setRole(layer, "fading");
+    this.syncPlayback();
+
+    window.clearTimeout(this.fadeTimer);
+    this.fadeTimer = window.setTimeout(() => {
+      this.fading = false;
+      if (!this.layers) return;
+      this.setRole(layer, "front");
+      this.front = layer;
+      if (this.incoming === layer) this.incoming = null;
+      if (outgoing && outgoing !== layer) {
+        this.setRole(outgoing, "standby");
+        this.setShow(outgoing, "none");
+        outgoing.lingering = false;
+        this.clearLayerTimers(outgoing);
+        outgoing.gen++;
+        outgoing.media = null;
+        this.release(outgoing);
+      }
+      if (layer.gen === gen) this.armLinger(layer);
+      this.evaluate();
+    }, BACKDROP_FADE_MS + 40);
+  }
+
+  /** Stop preparing a layer: its callbacks become no-ops, nothing of it shows. */
+  private abandon(layer: Layer): void {
+    this.clearLayerTimers(layer);
+    layer.gen++;
+    layer.media = null;
+    layer.lingering = false;
+    layer.filmWanted = false;
+    this.setRole(layer, "standby");
+    this.setShow(layer, "none");
+    this.release(layer);
   }
 
   /**
    * Scroll mode: once the front still has held for LINGER_MS, load its film
-   * into the same layer and fade it in over the still. Superseded by any new
-   * load (the token), and re-armed whenever the machine confirms the front.
+   * into the same layer; it fades in over the still on its first frame.
    */
-  private armLinger(): void {
-    window.clearTimeout(this.lingerTimer);
-    const layers = this.layers;
-    if (!layers || this.front < 0) return;
-    const index = this.front;
-    const layer = layers[index];
+  private armLinger(layer: Layer): void {
+    window.clearTimeout(layer.lingerTimer);
+    if (!layer.lingering || !layer.media?.video || !this.videoAllowed) return;
+    if (layer !== this.front || layer.show !== "still") return;
+    const gen = layer.gen;
     const media = layer.media;
-    if (!layer.lingering || !media?.video || !this.videoAllowed) return;
-    const token = this.token;
-    this.lingerTimer = window.setTimeout(() => {
-      if (
-        token !== this.token ||
-        this.front !== index ||
-        layer.media !== media ||
-        this.suspended.hidden ||
-        this.suspended.viewer
-      ) {
-        return;
-      }
+    layer.lingerTimer = window.setTimeout(() => {
+      if (layer.gen !== gen || layer !== this.front || !this.owns(layer)) return;
+      if (this.suspended.hidden || this.suspended.viewer) return;
       layer.lingering = false;
-      layer.kind = layer.root.dataset.kind = "video";
-      const abort = new AbortController();
-      this.abort = abort;
-      // Revealed by onVideoProgress the moment its frames move.
-      void this.prepareVideo(layer, media, abort.signal);
+      layer.filmWanted = true;
+      layer.video.style.objectPosition = media.position;
+      if (layer.video.getAttribute("src") !== media.video) {
+        layer.video.preload = "auto";
+        layer.video.src = media.video!;
+      }
+      this.syncPlayback();
+      this.onFilmSignal(layer);
     }, LINGER_MS);
   }
 
-  private cancelLoad(): void {
-    this.token++;
-    window.clearTimeout(this.graceTimer);
-    this.abort?.abort();
-    this.abort = null;
-    if (this.phase !== "loading" || !this.layers) return;
-    const standby = this.layers[this.standbyIndex()];
-    this.releaseUnpresented(standby);
-    this.setRole(standby, "standby");
-    this.phase = this.front >= 0 ? "active" : "idle";
-  }
+  /* ------------------------------------------------------------- playback */
 
-  private crossfade(index: number): void {
-    const layers = this.layers!;
-    const incoming = layers[index];
-    const outgoing = this.front >= 0 ? layers[this.front] : null;
-    this.phase = "crossfading";
-    this.setRole(incoming, "fading");
-
-    window.clearTimeout(this.fadeTimer);
-    this.fadeTimer = window.setTimeout(() => {
-      if (!this.layers) return;
-      this.setRole(incoming, "front");
-      if (outgoing) {
-        this.setRole(outgoing, "standby");
-        this.releaseUnpresented(outgoing);
+  /**
+   * The only place that decides what plays:
+   *   front     its film, if that film is showing, or is wanted and owns desired
+   *   incoming  its film while it prepares for (and owns) desired
+   * Everything else is paused. Nothing plays while hidden or under the viewer.
+   */
+  private syncPlayback(): void {
+    if (!this.layers) return;
+    const suspended = this.suspended.hidden || this.suspended.viewer;
+    for (const layer of this.layers) {
+      const src = layer.video.getAttribute("src");
+      const current = Boolean(src && layer.media?.video === src);
+      const wanted =
+        this.videoAllowed &&
+        !suspended &&
+        current &&
+        ((layer === this.front &&
+          (layer.show === "film" || (layer.filmWanted && this.owns(layer)))) ||
+          (layer === this.incoming && layer.filmWanted && this.owns(layer)));
+      if (wanted) {
+        if (layer.video.paused) this.play(layer);
+      } else {
+        this.clearStall(layer);
+        if (!layer.video.paused) this.pauseVideo(layer);
       }
-      this.front = index;
-      this.phase = "active";
-      this.syncPlayback();
-      this.reconcile();
-    }, BACKDROP_FADE_MS + 40);
-  }
-
-  /* ------------------------------------------------------------ the media */
-
-  /**
-   * Pause a layer's video, and if it never presented a frame, drop its source
-   * so an abandoned download stops competing with what is wanted now. A video
-   * that has been on screen keeps its buffer: returning to it is instant.
-   */
-  private releaseUnpresented(layer: LayerState): void {
-    const video = layer.video;
-    if (!video.paused) video.pause();
-    const src = video.getAttribute("src");
-    if (src && src !== layer.presented) {
-      video.removeAttribute("src");
-      video.load();
     }
   }
 
-  /** Put the media's still in the layer and resolve once it is decoded. Only
-   *  called when the still is actually needed — a still project, or a slow
-   *  video — so a fast video never costs an extra image decode. */
-  private decodeImage(
-    layer: LayerState,
-    media: ProjectBackdrop,
-  ): Promise<boolean> {
-    if (!media.image) return Promise.resolve(false);
-    layer.image.style.objectPosition = media.position;
-    if (layer.image.getAttribute("src") !== media.image) {
-      layer.image.src = media.image;
-    }
-    return layer.image
-      .decode()
-      .then(() => true)
-      .catch(() => layer.image.complete && layer.image.naturalWidth > 0);
+  private isWanted(layer: Layer): boolean {
+    if (!this.videoAllowed || this.suspended.hidden || this.suspended.viewer) return false;
+    const src = layer.video.getAttribute("src");
+    if (!src || layer.media?.video !== src) return false;
+    if (layer === this.front) return layer.show === "film" || (layer.filmWanted && this.owns(layer));
+    return layer === this.incoming && layer.filmWanted && this.owns(layer);
   }
 
-  private setVideoShown(layer: BackdropLayer, on: boolean): void {
-    layer.root.dataset.video = on ? "shown" : "hidden";
-  }
-
-  /**
-   * Resolves true once the layer's video is presenting advancing frames — not
-   * on `loadeddata`, which a paused or stalled element can report with
-   * nothing to show. An aborted signal settles nothing: the token check is
-   * what discards it, and its listeners are gone.
-   */
-  private prepareVideo(
-    layer: LayerState,
-    media: ProjectBackdrop,
-    signal: AbortSignal,
-  ): Promise<boolean> {
-    const video = layer.video;
-    video.style.objectPosition = media.position;
-    // The same file already in this layer is reused as it is: no refetch,
-    // no restart.
-    if (video.getAttribute("src") !== media.video) {
-      video.preload = "auto";
-      video.src = media.video!;
-    }
-
-    return new Promise<boolean>((resolve) => {
-      let settled = false;
-      const settle = (ok: boolean) => {
-        if (settled || signal.aborted) return;
-        settled = true;
-        resolve(ok);
-      };
-      const startTime = video.currentTime;
-      const onProgress = () => {
-        if (video.readyState >= 2 && !video.paused && video.currentTime !== startTime) {
-          settle(true);
-        }
-      };
-      const onPlaying = () => {
-        // The first presented frame, where the engine can tell us; otherwise
-        // the clock moving is the proof.
-        video.requestVideoFrameCallback?.(() => settle(true));
-      };
-      video.addEventListener("timeupdate", onProgress, { signal });
-      video.addEventListener("playing", onPlaying, { signal });
-      video.addEventListener("error", () => settle(false), { signal });
-      this.play(video, () => settle(false));
-      if (!video.paused && video.readyState >= 2) onPlaying();
-    });
-  }
-
-  private play(video: HTMLVideoElement, onRefused?: () => void): void {
+  private play(layer: Layer): void {
+    const { video } = layer;
+    const gen = layer.gen;
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
-    video.play().catch((error: unknown) => {
-      // Our own pause() superseding a request is not a failure.
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      onRefused?.();
-      if (
-        error instanceof DOMException &&
-        error.name === "NotAllowedError" &&
-        !this.retryArmed
-      ) {
-        // Low Power Mode and friends: stay on what is showing, and let the
-        // first real gesture try once more.
-        this.retryArmed = true;
-        window.addEventListener("pointerup", this.retryOnGesture, {
-          once: true,
-          passive: true,
-        });
+    video.play().then(
+      () => {
+        if (layer.gen === gen) this.onFilmSignal(layer);
+      },
+      (error: unknown) => {
+        // Superseded by our own pause or a source change: not a failure.
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (
+          error instanceof DOMException &&
+          error.name === "NotAllowedError" &&
+          !this.retryArmed
+        ) {
+          // Low Power Mode and friends: the still stays, and the first real
+          // gesture tries once more.
+          this.retryArmed = true;
+          window.addEventListener("pointerup", this.retryOnGesture, {
+            once: true,
+            passive: true,
+          });
+        }
+      },
+    );
+  }
+
+  private pauseVideo(layer: Layer): void {
+    layer.video.pause();
+  }
+
+  /**
+   * A pause the controller did not want — the browser's (a decoder, a power
+   * policy, a stalled loop). Our own pauses only ever happen to films that
+   * are no longer wanted, so `isWanted` alone tells them apart: ask again.
+   */
+  private onBrowserPause(layer: Layer): void {
+    if (!this.isWanted(layer)) return;
+    const now = performance.now();
+    if (now - layer.resumedAt < 1000) return;
+    layer.resumedAt = now;
+    const gen = layer.gen;
+    window.setTimeout(() => {
+      if (layer.gen === gen && layer.video.paused && this.isWanted(layer)) this.play(layer);
+    }, 0);
+  }
+
+  private armStall(layer: Layer): void {
+    if (layer.stallTimer || !this.isWanted(layer)) return;
+    const gen = layer.gen;
+    const at = layer.video.currentTime;
+    const armedAt = performance.now();
+    layer.stallTimer = window.setTimeout(() => {
+      layer.stallTimer = 0;
+      if (layer.gen !== gen || !this.isWanted(layer)) return;
+      if (layer.video.currentTime !== at || layer.stallReloads >= STALL_RELOADS) return;
+      // Bytes still arriving: slow, not stuck. Keep waiting.
+      if (layer.progressAt > armedAt) {
+        this.armStall(layer);
+        return;
       }
-    });
+      // Reload where it was: the one reliable way out of a WebKit start that
+      // sits at `waiting` with no further event.
+      layer.stallReloads++;
+      layer.frameRequested = -1; // a reload drops any pending frame request
+      const { video } = layer;
+      const resumeAt = video.currentTime;
+      video.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (layer.gen === gen && resumeAt > 0 && resumeAt < video.duration) {
+            video.currentTime = resumeAt;
+          }
+        },
+        { once: true },
+      );
+      video.load();
+      this.play(layer);
+    }, STALL_MS);
+  }
+
+  private clearStall(layer: Layer): void {
+    window.clearTimeout(layer.stallTimer);
+    layer.stallTimer = 0;
   }
 
   private retryOnGesture = () => {
     this.retryArmed = false;
-    this.failedKey = null;
     this.syncPlayback();
-    this.reconcile();
+    this.evaluate();
   };
 
-  /** Exactly the front video may advance at rest, and only when it can be
-   *  seen. A loading standby is driven by its own load. */
-  private syncPlayback(): void {
-    if (!this.layers) return;
-    const suspended = this.suspended.hidden || this.suspended.viewer;
-    this.layers.forEach((layer, index) => {
-      const isFront = index === this.front;
-      const loading = this.phase === "loading" && index === this.standbyIndex();
-      const wanted =
-        layer.kind === "video" &&
-        this.videoAllowed &&
-        !suspended &&
-        (isFront || loading || this.phase === "crossfading");
-      if (!wanted) {
-        if (!layer.video.paused) layer.video.pause();
-      } else if (layer.video.paused && layer.video.getAttribute("src")) {
-        this.play(layer.video);
-      }
-    });
+  /**
+   * Pause a layer's film, and if it never presented a frame drop its source,
+   * so an abandoned download stops competing with what is wanted now. A film
+   * that has been on screen keeps its buffer for an instant return.
+   */
+  private release(layer: Layer): void {
+    this.clearStall(layer);
+    if (!layer.video.paused) this.pauseVideo(layer);
+    const src = layer.video.getAttribute("src");
+    if (src && src !== layer.presented) {
+      layer.video.removeAttribute("src");
+      layer.video.load();
+    }
+  }
+
+  private clearLayerTimers(layer: Layer): void {
+    window.clearTimeout(layer.stillTimer);
+    window.clearTimeout(layer.lingerTimer);
+    this.clearStall(layer);
+  }
+
+  /* ------------------------------------------------------------------ DOM */
+
+  private setShow(layer: Layer, show: Show): void {
+    layer.show = show;
+    this.render(layer);
+  }
+
+  private render(layer: Layer): void {
+    layer.root.dataset.show = layer.show;
   }
 
   private setRole(layer: BackdropLayer, role: Role): void {

@@ -41,17 +41,23 @@
   object-position: center;
 }
 
-/* The controller's two layers. Roles, not animation state, live in the DOM:
+/* The controller's two layers. Two attributes, both owned by the controller:
 
-     standby   invisible, beneath everything, paused (keeps its source)
-     incoming  invisible, on top, preparing — nothing is ever faded into
-               before it has a real frame
+   data-role — where the layer is in the crossfade
+     standby   invisible, beneath everything, paused
+     incoming  invisible, on top, preparing — never faded into before it has
+               something of its own to show
      fading    on top, opacity 0 → 1 over the front, which stays opaque
                beneath it: one surface replaces another, no luminance dip
      front     opaque, the media at rest
 
-   Only `fading` carries a transition, so every other role change is instant
-   and invisible. The duration matches BACKDROP_FADE_MS. */
+   data-show — what the layer shows: none, its project's still, or its
+     project's film over that still. The single source of truth for which
+     element is visible; see homeBackdropController.
+
+   Only `fading` animates the layer, and a film revealed on a visible layer
+   fades in over its own still; every other change is instant and invisible.
+   The durations match BACKDROP_FADE_MS. */
 .layer {
   position: absolute;
   inset: 0;
@@ -74,20 +80,27 @@
   opacity: 1;
 }
 
-/* Inside a layer the still is always underneath and the video sits over it,
-   hidden until it presents a real frame. Revealed while the layer is invisible
-   it appears at once; revealed on a visible layer (a slow load that has
-   already crossfaded to its still) it fades over the still. Either way the
-   layer itself is never less than opaque content. */
-.layer video {
+/* Inside a layer the paint order is explicit, never left to DOM order: the
+   still at the bottom, the film above it. The film covers its still whenever
+   it shows; the still is only ever seen before the film's first frame, when
+   the film cannot play, or for a still project. */
+.still {
+  z-index: 0;
   opacity: 0;
 }
 
-.layer[data-video="shown"] video {
+.film {
+  z-index: 1;
+  opacity: 0;
+}
+
+.layer[data-show="still"] .still,
+.layer[data-show="film"] .still,
+.layer[data-show="film"] .film {
   opacity: 1;
 }
 
-.layer[data-role="fading"] video,
-.layer[data-role="front"] video {
+.layer[data-role="fading"] .film,
+.layer[data-role="front"] .film {
   transition: opacity 360ms cubic-bezier(0.4, 0, 0.2, 1);
 }
