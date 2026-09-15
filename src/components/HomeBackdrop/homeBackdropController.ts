@@ -23,6 +23,18 @@ import type { ProjectBackdrop } from "@/data/projects";
  * hovers ago can never surface. A crossfade is never cut short: a newer target
  * is reconciled the moment it lands, which is at most one fade away.
  *
+ * Two questions are kept apart on purpose:
+ *
+ *   WHEN to crossfade   decided by the load's own readiness promise and token
+ *   WHETHER a film is   decided by the element itself (see onVideoProgress):
+ *   visible in its      a layer's own film that is playing with a moving clock
+ *   layer               is shown, whichever load, retry or resume started it
+ *
+ * They used to be one promise. Any film that started outside it — after a
+ * superseded load, a return to the same card while another loaded, or an
+ * autoplay refusal retried by a gesture — played on, decoding, behind its own
+ * still, and never appeared.
+ *
  * Plain TypeScript and no React state: hover moves nothing in the React tree.
  */
 
@@ -90,6 +102,8 @@ export class HomeBackdropController {
   private target: ProjectBackdrop | null = null;
   private token = 0;
   private abort: AbortController | null = null;
+  /** The per-layer element listeners, for the life of one attach. */
+  private lifetime: AbortController | null = null;
   private fadeTimer = 0;
   private enterTimer = 0;
   private graceTimer = 0;
@@ -123,10 +137,20 @@ export class HomeBackdropController {
     this.front = -1;
     this.phase = "idle";
     this.setCapabilities(capabilities);
-    for (const layer of this.layers) this.setRole(layer, "standby");
+    this.lifetime?.abort();
+    this.lifetime = new AbortController();
+    for (const layer of this.layers) {
+      this.setRole(layer, "standby");
+      const onProgress = () => this.onVideoProgress(layer);
+      layer.video.addEventListener("timeupdate", onProgress, {
+        signal: this.lifetime.signal,
+      });
+    }
   }
 
   detach(): void {
+    this.lifetime?.abort();
+    this.lifetime = null;
     this.cancelLoad();
     window.clearTimeout(this.fadeTimer);
     window.clearTimeout(this.enterTimer);
@@ -348,6 +372,25 @@ export class HomeBackdropController {
   }
 
   /**
+   * The one authority on a film's visibility inside its layer.
+   *
+   * `timeupdate` only fires while the clock moves, so together with a decoded
+   * frame and a playing element it is proof there is a real, advancing picture
+   * — never a black or empty element. Only the layer's own current film
+   * counts: a stale source still in the element after a switch is ignored.
+   * Revealing an invisible (incoming) layer is instant and harmless; on a
+   * visible layer showing its still, the film fades in over the still.
+   */
+  private onVideoProgress(layer: LayerState): void {
+    const video = layer.video;
+    const src = video.getAttribute("src");
+    if (!src || layer.kind !== "video" || layer.media?.video !== src) return;
+    if (video.paused || video.readyState < 2) return;
+    layer.presented = src;
+    if (layer.root.dataset.video !== "shown") this.setVideoShown(layer, true);
+  }
+
+  /**
    * Scroll mode: once the front still has held for LINGER_MS, load its film
    * into the same layer and fade it in over the still. Superseded by any new
    * load (the token), and re-armed whenever the machine confirms the front.
@@ -375,11 +418,8 @@ export class HomeBackdropController {
       layer.kind = layer.root.dataset.kind = "video";
       const abort = new AbortController();
       this.abort = abort;
-      this.prepareVideo(layer, media, abort.signal).then((ok) => {
-        if (token !== this.token || !ok) return;
-        layer.presented = media.video!;
-        this.setVideoShown(layer, true);
-      });
+      // Revealed by onVideoProgress the moment its frames move.
+      void this.prepareVideo(layer, media, abort.signal);
     }, LINGER_MS);
   }
 
