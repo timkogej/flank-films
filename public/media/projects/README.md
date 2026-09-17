@@ -15,13 +15,13 @@ ffmpeg build has no WebP or AVIF encoder — checked again on 2026-09-10, and
 
 | Slot | Project / slug | Source master | Poster | Preview segment and loop | Mode | Preview | Full film |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 01 | Pingo — Pingo Vitamin Water / `pingo-2` | `Pingo_Scenarij2_15s_16-9_27052026_Final.mp4` | 4.50s, 1920×1080, 0.16 MB | 0.40–10.00s; natural seasonal/graphic editorial cut | autoplay | 1280×720, 9.60s, 3.74 MB | 1920×1080, 15.02s, 13.62 MB |
+| 01 | Fructal — Pingo Vitamin Water / `pingo-2` | `Pingo_Scenarij2_15s_16-9_27052026_Final.mp4` | 4.50s, 1920×1080, 0.16 MB | 0.40–10.00s; natural seasonal/graphic editorial cut | autoplay | 1280×720, 9.60s, 3.74 MB | 1920×1080, 15.02s, 13.62 MB |
 | 02 | Fresh 32 — Feel the freshness / `fresh32` | `Fresh32.mp4` | 5.80s, 1920×1080, 0.15 MB | 3.20–12.20s; cyclic 0.40s macro-particle overlap | hover | 1280×720, 8.60s, 2.85 MB | 1920×1080, 18.37s, 11.61 MB |
 | 03 | Petrol — OOH Billboard / `petrol` | `PETROL_Kava na putu_mockup.png` | 1600×1074, 0.26 MB | — (still project, no video) | still | — | still 2560×1718, 0.65 MB |
 | 04 | Schweppes — Take your time / `schweppes` | `Schweps ad_169.mp4` | 5.167s, 1920×1080, 0.13 MB | 5.167–11.900s; source cut to source cut | hover | 1280×720, 6.73s, 1.93 MB | 1920×1080, 15.07s, 12.41 MB |
 | 05 | Bohinj — Push the limit (spec) / `bohinj-vertical` | `Push the limits_Bohinj_Ad_9_16.mp4` | 9.20s, 1080×1920, 0.15 MB | 7.00–13.75s; natural motion/edit cut before the logo | autoplay | 720×1280, 6.75s, 3.76 MB | 1080×1920, 15.07s, 21.74 MB |
-| 06 | Pingo — Pingo Vitamin Water / `pingo-1` | `Pingo_Scenarij1_15s_16-9_27052026_Final.mp4` | 4.00s, 1920×1080, 0.11 MB | 5.28–11.20s; matched water/splash motion cut | autoplay | 1280×720, 5.92s, 6.45 MB | 1920×1080, 15.02s, 22.95 MB |
-| 07 | Pingo — Pingo Vitamin Water / `pingo-3` | `Pingo_Scenarij3_10s_16-9_27052026_Final.mp4` | 3.60s, 1920×1080, 0.33 MB | 0.40–6.56s; natural gesture/edit cut before packshot | hover | 1280×720, 6.16s, 2.91 MB | 1920×1080, 10.01s, 9.89 MB |
+| 06 | Fructal — Pingo Vitamin Water / `pingo-1` | `Pingo_Scenarij1_15s_16-9_27052026_Final.mp4` | 4.00s, 1920×1080, 0.11 MB | 5.28–11.20s; matched water/splash motion cut | autoplay | 1280×720, 5.92s, 6.45 MB | 1920×1080, 15.02s, 22.95 MB |
+| 07 | Fructal — Pingo Vitamin Water / `pingo-3` | `Pingo_Scenarij3_10s_16-9_27052026_Final.mp4` | 3.60s, 1920×1080, 0.33 MB | 0.40–6.56s; natural gesture/edit cut before packshot | hover | 1280×720, 6.16s, 2.91 MB | 1920×1080, 10.01s, 9.89 MB |
 | 08 | OTP Banka — Pogumno je iti na zmago / `otp` | `OTP_Image_TVC_sep2026_25s_YT.mov` | 1.20s, 1920×1080, 0.53 MB | 5.00–12.00s; natural cut on the existing edit | autoplay | 1280×720, 7.00s, 2.69 MB | 1920×1080, 25.00s, 60.00 MB |
 
 Active derivative weight is approximately **179.0 MB**: 2.48 MB posters and

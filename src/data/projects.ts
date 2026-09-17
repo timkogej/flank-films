@@ -347,9 +347,9 @@ export const developmentProjects: Project[] = [
  * breakpoint places each `data-slot` by id — so an id is a position in the
  * art direction, not a serial number.
  *
- *   01 Pingo, the tall anchor        05 Bohinj, the one portrait film
- *   02 Fresh 32 |                    06 Pingo |  the small pair
- *   03 Petrol   | the small pair     07 Pingo |
+ *   01 Fructal, the tall anchor      05 Bohinj, the one portrait film
+ *   02 Fresh 32 |                    06 Fructal |  the small pair
+ *   03 Petrol   | the small pair     07 Fructal |
  *   04 Schweppes, the wide upper     08 OTP Banka, the wide closer
  *
  * Four previews autoplay (01, 05, 06, 08) and three wait to be approached
@@ -363,7 +363,7 @@ export const projects: Project[] = [
     // campaign, and the scenario number is an internal fact, not a public name.
     id: "01",
     slug: "pingo-2",
-    title: "Pingo",
+    title: "Fructal",
     campaign: "Pingo Vitamin Water",
     productionMode: "AI",
     year: 2026,
@@ -469,7 +469,7 @@ export const projects: Project[] = [
   {
     id: "06",
     slug: "pingo-1",
-    title: "Pingo",
+    title: "Fructal",
     campaign: "Pingo Vitamin Water",
     productionMode: "AI",
     year: 2026,
@@ -488,7 +488,7 @@ export const projects: Project[] = [
   {
     id: "07",
     slug: "pingo-3",
-    title: "Pingo",
+    title: "Fructal",
     campaign: "Pingo Vitamin Water",
     productionMode: "AI",
     year: 2026,
