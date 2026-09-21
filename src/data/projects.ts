@@ -431,7 +431,6 @@ export const projects: Project[] = [
     title: "Schweppes",
     campaign: "Just a sip away",
     productionMode: "AI",
-    spec: true,
     year: 2026,
     format: "commercial",
     previewMode: "hover",
@@ -453,7 +452,6 @@ export const projects: Project[] = [
     title: "Bohinj",
     campaign: "Push the limit",
     productionMode: "AI",
-    spec: true,
     format: "commercial",
     previewMode: "autoplay",
     media: {
