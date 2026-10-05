@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
@@ -166,10 +167,17 @@ export function Analytics() {
         <section className={styles.banner} aria-label="Analytics consent">
           <p className={styles.copy}>
             We use analytics to understand how people use this site and improve
-            the experience.
+            the experience.{" "}
+            <Link href="/privacy" className={styles.privacyLink}>
+              Privacy
+            </Link>
           </p>
           <div className={styles.actions}>
-            <button type="button" onClick={() => decide("granted")}>
+            <button
+              id="analytics-consent-accept"
+              type="button"
+              onClick={() => decide("granted")}
+            >
               Accept
             </button>
             <button type="button" onClick={() => decide("denied")}>

@@ -1,6 +1,6 @@
-import { aboutSeo, contact, site, social } from "@/lib/site";
+import { aboutSeo, contact, privacySeo, site, social } from "@/lib/site";
 
-type StructuredDataPage = "home" | "about";
+type StructuredDataPage = "home" | "about" | "privacy";
 
 const homeUrl = `${site.url}/`;
 
@@ -8,6 +8,7 @@ const ids = {
   organization: `${homeUrl}#organization`,
   website: `${homeUrl}#website`,
   homePage: `${homeUrl}#webpage`,
+  privacyPage: site.url + "/privacy#webpage",
   aboutPage: `${site.url}/about#webpage`,
 } as const;
 
@@ -20,6 +21,7 @@ function createGraph(page: StructuredDataPage) {
     "@type": "Organization",
     "@id": ids.organization,
     name: site.name,
+    legalName: "Lan Lamut s.p., Flank Films",
     alternateName: "FLANK",
     url: homeUrl,
     description: site.entityDescription,
@@ -56,18 +58,30 @@ function createGraph(page: StructuredDataPage) {
           publisher: { "@id": ids.organization },
           inLanguage: "en",
         }
-      : {
-          "@type": "AboutPage",
-          "@id": ids.aboutPage,
-          url: `${site.url}/about`,
-          name: `${aboutSeo.title} — ${site.name}`,
-          description: aboutSeo.description,
-          isPartOf: { "@id": ids.website },
-          about: { "@id": ids.organization },
-          mainEntity: { "@id": ids.organization },
-          publisher: { "@id": ids.organization },
-          inLanguage: "en",
-        };
+      : page === "about"
+        ? {
+            "@type": "AboutPage",
+            "@id": ids.aboutPage,
+            url: site.url + "/about",
+            name: aboutSeo.title + " — " + site.name,
+            description: aboutSeo.description,
+            isPartOf: { "@id": ids.website },
+            about: { "@id": ids.organization },
+            mainEntity: { "@id": ids.organization },
+            publisher: { "@id": ids.organization },
+            inLanguage: "en",
+          }
+        : {
+            "@type": "WebPage",
+            "@id": ids.privacyPage,
+            url: site.url + "/privacy",
+            name: privacySeo.title + " — " + site.name,
+            description: privacySeo.description,
+            isPartOf: { "@id": ids.website },
+            about: { "@id": ids.organization },
+            publisher: { "@id": ids.organization },
+            inLanguage: "en",
+          };
 
   return {
     "@context": "https://schema.org",

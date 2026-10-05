@@ -28,6 +28,12 @@ export const aboutSeo = {
     "Meet FLANK FILMS, an independent commercial production company based in Slovenia. Explore our filmmaking, AI and AI-hybrid approach for agencies, and get in touch.",
 } as const;
 
+export const privacySeo = {
+  title: "Privacy & Legal",
+  description:
+    "Privacy, cookie and legal information for FLANK FILMS, including website analytics, data processing, consent choices and company details.",
+} as const;
+
 export const social = {
   instagram: "https://www.instagram.com/flankfilms/",
   linkedin: "https://www.linkedin.com/company/flankfilms",

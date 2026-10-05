@@ -1,5 +1,6 @@
 import { DarkLightIntro } from "@/components/IntroDarkLight/DarkLightIntro";
 import { Header } from "@/components/Header/Header";
+import { LegalFooter } from "@/components/Legal/LegalFooter";
 import { HomeBackdrop } from "@/components/HomeBackdrop/HomeBackdrop";
 import { HomeBackdropProvider } from "@/components/HomeBackdrop/HomeBackdropContext";
 import { ProjectMosaic } from "@/components/ProjectMosaic/ProjectMosaic";
@@ -28,6 +29,7 @@ export default function HomePage() {
               </h1>
               <ProjectMosaic projects={visibleProjects} />
             </main>
+            <LegalFooter />
           </div>
         </HomeBackdropProvider>
       </DarkLightIntro>

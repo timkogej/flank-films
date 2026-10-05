@@ -161,7 +161,7 @@ function swap(
  * by the first press, keeps one DOM identity through every open, close and
  * switch, and opening changes nothing about it but `visibility`.
  */
-export function MobileNav({ current }: { current: PageKey }) {
+export function MobileNav({ current }: { current: PageKey | null }) {
   const hydrated = useSyncExternalStore(noSubscription, onClient, onServer);
   /** The shell is showing — including through its close transition. Hidden
    *  (not unmounted) otherwise; see the note above. */

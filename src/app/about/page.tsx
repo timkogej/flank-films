@@ -4,6 +4,7 @@ import { AboutPanel } from "@/components/About/AboutPanel";
 import { FlankLightPanel } from "@/components/About/FlankLightPanel";
 import { VisualPanel } from "@/components/About/VisualPanel";
 import { Header } from "@/components/Header/Header";
+import { LegalFooter } from "@/components/Legal/LegalFooter";
 import { DarkLightIntro } from "@/components/IntroDarkLight/DarkLightIntro";
 import { aboutSeo, site } from "@/lib/site";
 import { StructuredData } from "@/lib/structuredData";
@@ -64,6 +65,7 @@ export default function AboutPage() {
               <VisualPanel />
             </section>
           </main>
+          <LegalFooter />
         </div>
       </DarkLightIntro>
     </>

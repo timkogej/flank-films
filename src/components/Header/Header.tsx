@@ -26,7 +26,7 @@ import styles from "./Header.module.css";
  * from `usePathname()` so this stays a server component; only the phone menu,
  * which needs state, is a client island.
  */
-export function Header({ current = "home" }: { current?: PageKey }) {
+export function Header({ current = "home" }: { current?: PageKey | null }) {
   const navLink = (page: PageKey) =>
     `${styles.link} ${page === current ? styles.linkCurrent : styles.linkInactive}`;
 
