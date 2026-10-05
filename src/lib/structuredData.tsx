@@ -19,7 +19,8 @@ function createGraph(page: StructuredDataPage) {
   const organization = {
     "@type": "Organization",
     "@id": ids.organization,
-    name: site.legalName,
+    name: site.name,
+    alternateName: "FLANK",
     url: homeUrl,
     description: site.entityDescription,
     logo: absoluteUrl(site.logo),
@@ -37,7 +38,7 @@ function createGraph(page: StructuredDataPage) {
     "@type": "WebSite",
     "@id": ids.website,
     url: homeUrl,
-    name: site.legalName,
+    name: site.name,
     publisher: { "@id": ids.organization },
     inLanguage: "en",
   };
@@ -52,17 +53,19 @@ function createGraph(page: StructuredDataPage) {
           description: site.description,
           isPartOf: { "@id": ids.website },
           about: { "@id": ids.organization },
+          publisher: { "@id": ids.organization },
           inLanguage: "en",
         }
       : {
           "@type": "AboutPage",
           "@id": ids.aboutPage,
           url: `${site.url}/about`,
-          name: `${aboutSeo.title} — ${site.legalName}`,
+          name: `${aboutSeo.title} — ${site.name}`,
           description: aboutSeo.description,
           isPartOf: { "@id": ids.website },
           about: { "@id": ids.organization },
           mainEntity: { "@id": ids.organization },
+          publisher: { "@id": ids.organization },
           inLanguage: "en",
         };
 

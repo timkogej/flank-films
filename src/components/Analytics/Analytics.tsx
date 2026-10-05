@@ -51,7 +51,7 @@ function PageViews() {
         pathname === "/"
           ? site.title
           : pathname === "/about"
-            ? `${aboutSeo.title} — ${site.legalName}`
+            ? `${aboutSeo.title} — ${site.name}`
             : document.title,
     });
   }, [pathname]);

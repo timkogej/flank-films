@@ -18,15 +18,15 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: site.legalName,
-    title: `${aboutSeo.title} — ${site.legalName}`,
+    siteName: site.name,
+    title: `${aboutSeo.title} — ${site.name}`,
     description: aboutSeo.description,
     url: "/about",
     images: [site.socialImage],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${aboutSeo.title} — ${site.legalName}`,
+    title: `${aboutSeo.title} — ${site.name}`,
     description: aboutSeo.description,
     images: [site.socialImage],
   },

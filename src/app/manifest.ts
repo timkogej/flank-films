@@ -4,7 +4,7 @@ import { site } from "@/lib/site";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: site.legalName,
+    name: site.name,
     short_name: site.name,
     icons: [
       {

@@ -25,7 +25,7 @@ export const brandStatement: readonly string[] = [
  * no manual line breaks.
  */
 export const aboutParagraphs: string[] = [
-  "Flank Films is an independent production company built around a simple belief: ambitious ideas deserve equally ambitious execution.",
+  "FLANK FILMS is an independent commercial production company based in Slovenia, built around a simple belief: ambitious ideas deserve equally ambitious execution.",
   "Based in the Adria region and looking beyond borders, we partner with creative agencies to turn bold concepts into distinctive commercial films. We get close to the idea, understand what makes it work, and carry that thinking through every production decision, down to the final frame.",
   "Our name reflects our role. To stand beside the people behind the idea. To bring creative judgment, technical ingenuity and a shared commitment to making the work as strong as it can be. We combine filmmaking craft with AI and AI-hybrid production, opening up new possibilities for what can be imagined and brought to screen.",
   "Our vision is to help shape the next generation of European production, giving creative teams greater freedom to explore, the confidence to push further, and a partner who takes responsibility for the result.",

@@ -6,8 +6,7 @@
  */
 
 export const site = {
-  name: "FLANK",
-  legalName: "FLANK FILMS",
+  name: "FLANK FILMS",
   title: "FLANK FILMS — Commercial Production for Agencies",
   description:
     "Independent commercial production for creative agencies and brands, combining filmmaking craft, AI and AI-hybrid production from Slovenia across Europe.",
@@ -26,7 +25,7 @@ export const site = {
 export const aboutSeo = {
   title: "About & Contact",
   description:
-    "Meet FLANK FILMS, an independent production company in Slovenia. Explore our filmmaking, AI and AI-hybrid approach for agencies, and get in touch.",
+    "Meet FLANK FILMS, an independent commercial production company based in Slovenia. Explore our filmmaking, AI and AI-hybrid approach for agencies, and get in touch.",
 } as const;
 
 export const social = {
